@@ -4,7 +4,7 @@
   const INITIAL = window.QTE_INITIAL_DATA;
   if (!INITIAL) throw new Error("No se pudo cargar data.js");
 
-  const APP_VERSION = "8.0.0";
+  const APP_VERSION = "8.1.0";
   const STORAGE_KEY = "qte-lab-pages-v8";
   const DB_NAME = "qte-lab-media-v8";
   const DB_STORE = "media";
@@ -14,11 +14,8 @@
   const DECK_SIZE = 12;
   const HAND_SIZE = 3;
   const MIN_TAP_TIME = 0.3;
-  const HOLD_MIN = 1.5;
-  const HOLD_MAX = 3.0;
-  const HOLD_BONUS = 0.05;
   const RAW_POWER_MIN = 1.0;
-  const RAW_POWER_MAX = (1 / MIN_TAP_TIME) + HOLD_BONUS;
+  const RAW_POWER_MAX = 1 / MIN_TAP_TIME;
   const AI_CONFIG = {
     "Fácil": {accuracyMin:.50, accuracyMax:.70, reactionMin:300, reactionMax:520},
     "Normal": {accuracyMin:.70, accuracyMax:.90, reactionMin:180, reactionMax:340},
@@ -49,17 +46,21 @@
   const randomBetween = (min,max) => min + Math.random()*(max-min);
 
   function normalizeAction(value) {
-    if (typeof value === "string") return {button:value, kind:"tap", holdDuration:0};
-    return {
-      button:String(value.boton ?? value.button ?? ""),
-      kind:String(value.tipo ?? value.kind ?? "tap").toLowerCase(),
-      holdDuration:Number(value.duracion ?? value.holdDuration ?? value.hold_duration ?? 0)
-    };
+    const button = typeof value === "string"
+      ? value
+      : String(value?.boton ?? value?.button ?? "");
+    return {button, kind:"tap"};
   }
-  function serializeAction(action) {
-    return action.kind === "hold"
-      ? {boton:action.button, tipo:"hold", duracion:round(Number(action.holdDuration),3)}
-      : action.button;
+  function serializeAction(action) { return action.button; }
+  function migrateCardsToTap(cards) {
+    if (!Array.isArray(cards)) return [];
+    return cards.map(card => ({
+      ...card,
+      secciones: Array.isArray(card.secciones) ? card.secciones.map(section => ({
+        ...section,
+        botones: Array.isArray(section.botones) ? section.botones.map(value => normalizeAction(value).button) : []
+      })) : []
+    }));
   }
   function cardActions(card) {
     return card.secciones.flatMap(section => section.botones.map(normalizeAction));
@@ -67,16 +68,12 @@
   function cardTotalButtons(card) { return card.secciones.reduce((sum,s)=>sum+s.botones.length,0); }
   function cardTotalTime(card) { return card.secciones.reduce((sum,s)=>sum+Number(s.tiempo||0),0); }
   function sectionMinimumTime(section) {
-    const actions=section.botones.map(normalizeAction);
-    const taps=actions.filter(a=>a.kind!=="hold").length;
-    const holds=actions.filter(a=>a.kind==="hold").reduce((sum,a)=>sum+Number(a.holdDuration||0),0);
-    return Math.max(MIN_TAP_TIME,taps*MIN_TAP_TIME+holds);
+    return Math.max(MIN_TAP_TIME, section.botones.length * MIN_TAP_TIME);
   }
   function cardMinimumTime(card) { return card.secciones.reduce((sum,s)=>sum+sectionMinimumTime(s),0); }
-  function hasHold(card) { return cardActions(card).some(a=>a.kind==="hold"); }
   function rawPower(card) {
     const total=cardTotalTime(card);
-    return total>0 ? cardTotalButtons(card)/total + (hasHold(card)?HOLD_BONUS:0) : 0;
+    return total>0 ? cardTotalButtons(card)/total : 0;
   }
   function variationCoefficient(card) {
     const buttons=cardActions(card).map(a=>a.button);
@@ -111,8 +108,6 @@
       if (!Array.isArray(section.botones)||section.botones.length<1) errors.push(`La sección ${index+1} necesita al menos una acción.`);
       section.botones.map(normalizeAction).forEach((action,aIndex)=>{
         if (!BUTTONS.includes(action.button)) errors.push(`Acción ${aIndex+1} inválida en la sección ${index+1}.`);
-        if (!["tap","hold"].includes(action.kind)) errors.push(`Tipo de acción inválido en la sección ${index+1}.`);
-        if (action.kind==="hold" && (action.holdDuration<HOLD_MIN || action.holdDuration>HOLD_MAX)) errors.push(`Los HOLD deben durar entre ${HOLD_MIN} y ${HOLD_MAX} s.`);
       });
       if (time+1e-9<sectionMinimumTime(section)) errors.push(`La sección “${section.nombre||index+1}” necesita al menos ${sectionMinimumTime(section).toFixed(2)} s.`);
     });
@@ -195,8 +190,6 @@
       this.active=false;
       this.finished=false;
       this.finishReason="";
-      this.holdingButton=null;
-      this.holdStartedAt=0;
       this.result=null;
     }
     now(){ return performance.now()/1000; }
@@ -212,15 +205,10 @@
       if(!this.currentSection||!this.active)return 0;
       return Math.max(0,Number(this.currentSection.tiempo)-(this.now()-this.sectionStartedAt));
     }
-    get holdProgress(){
-      const action=this.expectedAction;
-      if(!action||action.kind!=="hold"||this.holdingButton!==action.button)return 0;
-      return clamp((this.now()-this.holdStartedAt)/Math.max(action.holdDuration,.001),0,1);
-    }
     start(){
       const now=this.now();
       this.currentSectionIndex=0;this.currentButtonIndex=0;this.correctCount=0;this.incorrectCount=0;this.missedCount=0;
-      this.startedAt=now;this.sectionStartedAt=now;this.finishedAt=0;this.active=true;this.finished=false;this.finishReason="";this.holdingButton=null;this.result=null;
+      this.startedAt=now;this.sectionStartedAt=now;this.finishedAt=0;this.active=true;this.finished=false;this.finishReason="";this.result=null;
     }
     begin(button){
       if(!this.active||this.finished)return {correct:false,finished:this.finished};
@@ -228,48 +216,26 @@
       const action=this.expectedAction;
       if(!action){this.finish("sin_secuencia");return {correct:false,finished:true};}
       if(button!==action.button){this.incorrectCount++;return {correct:false,expected:action.button};}
-      if(action.kind==="hold"){
-        if(this.holdingButton!==button){this.holdingButton=button;this.holdStartedAt=this.now();}
-        return {correct:true,holdStarted:true,expected:action.button};
-      }
       const changed=this.complete(this.now());
       return {correct:true,actionCompleted:true,sectionChanged:changed,finished:this.finished,expected:action.button};
-    }
-    end(button){
-      const action=this.expectedAction;
-      if(!this.active||this.finished)return {correct:false,finished:this.finished};
-      if(this.holdingButton!==button||!action||action.kind!=="hold")return {correct:true};
-      const now=this.now();
-      if(now-this.holdStartedAt+1e-9>=action.holdDuration){
-        const changed=this.complete(this.holdStartedAt+action.holdDuration);
-        return {correct:true,actionCompleted:true,sectionChanged:changed,finished:this.finished};
-      }
-      this.holdingButton=null;this.holdStartedAt=0;this.incorrectCount++;
-      return {correct:false,holdFailed:true};
     }
     update(){
       if(!this.active||this.finished)return this.finished;
       const now=this.now();
-      const action=this.expectedAction;
-      if(action&&action.kind==="hold"&&this.holdingButton===action.button&&now-this.holdStartedAt>=action.holdDuration){
-        const completion=this.holdStartedAt+action.holdDuration;
-        const deadline=this.sectionStartedAt+Number(this.currentSection?.tiempo||0);
-        if(completion<=deadline+1e-9)this.complete(completion);
-      }
       while(this.active&&!this.finished){
         const section=this.currentSection;
         if(!section){this.finish("completado",now);break;}
         const deadline=this.sectionStartedAt+Number(section.tiempo);
         if(now<deadline)break;
         this.missedCount+=Math.max(0,section.botones.length-this.currentButtonIndex);
-        this.holdingButton=null;this.holdStartedAt=0;this.currentSectionIndex++;this.currentButtonIndex=0;
+        this.currentSectionIndex++;this.currentButtonIndex=0;
         if(this.currentSectionIndex>=this.card.secciones.length){this.finish("tiempo_agotado",now);break;}
         this.sectionStartedAt=deadline;
       }
       return this.finished;
     }
     complete(now){
-      this.correctCount++;this.currentButtonIndex++;this.holdingButton=null;this.holdStartedAt=0;
+      this.correctCount++;this.currentButtonIndex++;
       let changed=false;
       const section=this.currentSection;
       if(section&&this.currentButtonIndex>=section.botones.length){
@@ -282,7 +248,7 @@
     finish(reason,now=null){
       if(this.finished)return;
       const at=now??this.now();
-      this.active=false;this.finished=true;this.finishReason=reason;this.finishedAt=at;this.holdingButton=null;
+      this.active=false;this.finished=true;this.finishReason=reason;this.finishedAt=at;
       const real=Math.max(0,this.finishedAt-this.startedAt);
       const coefficient=variationCoefficient(this.card);
       this.result={
@@ -305,7 +271,7 @@
   function defaultState(){
     const decks=clone(INITIAL.starterDecks);
     return {
-      cards:clone(INITIAL.cards),decks,
+      cards:migrateCardsToTap(clone(INITIAL.cards)),decks,
       playerDeck:clone(decks["Inicial Fácil"]||[]),enemyDeck:clone(decks["Inicial Medio"]||[]),
       settings:clone(DEFAULT_SETTINGS)
     };
@@ -314,9 +280,9 @@
     const fallback=defaultState();
     try{
       const stored=JSON.parse(localStorage.getItem(STORAGE_KEY)||"null");
-      if(!stored||stored.version!==APP_VERSION)Object.assign(state,fallback);
+      if(!stored)Object.assign(state,fallback);
       else {
-        state.cards=Array.isArray(stored.cards)?stored.cards:fallback.cards;
+        state.cards=Array.isArray(stored.cards)?migrateCardsToTap(stored.cards):fallback.cards;
         state.decks=stored.decks&&typeof stored.decks==="object"?stored.decks:fallback.decks;
         state.playerDeck=Array.isArray(stored.playerDeck)?stored.playerDeck:fallback.playerDeck;
         state.enemyDeck=Array.isArray(stored.enemyDeck)?stored.enemyDeck:fallback.enemyDeck;
@@ -429,7 +395,7 @@
           <button type="button" class="ghost" data-action="activate-section" data-index="${index}">${index===editor.activeSection?"Activa":"Activar"}</button>
           <button type="button" class="ghost danger-text" data-action="remove-section" data-index="${index}">Eliminar</button>
         </div>
-        <div class="section-actions">${actions.length?actions.map((action,aIndex)=>`<span class="action-pill">${LABELS[action.button]||action.button}${action.kind==="hold"?`<small>HOLD ${action.holdDuration.toFixed(1)}s</small>`:""}<button type="button" data-action="remove-action" data-index="${index}" data-action-index="${aIndex}">×</button></span>`).join(""):"<span class='muted'>Sin acciones todavía.</span>"}</div>
+        <div class="section-actions">${actions.length?actions.map((action,aIndex)=>`<span class="action-pill">${LABELS[action.button]||action.button}<button type="button" data-action="remove-action" data-index="${index}" data-action-index="${aIndex}">×</button></span>`).join(""):"<span class='muted'>Sin acciones todavía.</span>"}</div>
         <div class="section-footer"><small>Mínimo humano: ${sectionMinimumTime(section).toFixed(2)} s</small><div><button type="button" class="ghost" data-action="adjust-section" data-index="${index}">Ajustar al mínimo</button> <button type="button" class="ghost" data-action="clear-section" data-index="${index}">Limpiar</button></div></div>
       </article>`;
     }).join("");
@@ -446,9 +412,7 @@
   }
   function addEditorAction(button){
     const section=editor.card.secciones[editor.activeSection]; if(!section)return;
-    const kind=$("#editorActionType").value;
-    const holdDuration=clamp(Number($("#editorHoldDuration").value)||1.8,HOLD_MIN,HOLD_MAX);
-    section.botones.push(kind==="hold"?{boton:button,tipo:"hold",duracion:holdDuration}:button);
+    section.botones.push(button);
     renderEditorSections();updateEditorSummary();
   }
   async function saveEditor(){
@@ -613,11 +577,8 @@
     $("#qteTimer").textContent=engine.sectionRemaining.toFixed(2);
     $("#qteSequence").innerHTML=section.botones.map((value,index)=>{
       const action=normalizeAction(value);let cls=index<engine.currentButtonIndex?"done":index===engine.currentButtonIndex?"current":"";
-      return `<span class="qte-chip ${cls}">${LABELS[action.button]||action.button}${action.kind==="hold"?`<small>HOLD ${action.holdDuration.toFixed(1)}s</small>`:""}</span>`;
+      return `<span class="qte-chip ${cls}">${LABELS[action.button]||action.button}</span>`;
     }).join("");
-    const expected=engine.expectedAction;const holding=expected?.kind==="hold"&&engine.holdingButton===expected.button;
-    $("#holdProgressWrap").classList.toggle("hidden",!holding);
-    if(holding){$("#holdProgressLabel").textContent=`MANTÉN ${LABELS[expected.button]} · ${expected.holdDuration.toFixed(1)} s`;$("#holdProgressFill").style.width=`${engine.holdProgress*100}%`;}
   }
   function qteLoop(){
     const battle=state.battle;const engine=battle?.engine;if(!battle||!engine||battle.phase!=="qte")return;
@@ -634,9 +595,8 @@
     const battle=state.battle;if(!battle||battle.phase!=="qte"||!battle.engine)return;
     element.classList.add("pressed");const result=battle.engine.begin(buttonName);flashController(buttonName,!!result.correct);renderQte();
   }
-  function controllerUp(buttonName,element){
-    element.classList.remove("pressed");const battle=state.battle;if(!battle||battle.phase!=="qte"||!battle.engine)return;
-    const result=battle.engine.end(buttonName);if(result.holdFailed)flashController(buttonName,false);renderQte();
+  function controllerUp(_buttonName,element){
+    element.classList.remove("pressed");
   }
   function simulateAI(card,difficulty){
     const config=AI_CONFIG[difficulty]||AI_CONFIG.Normal;let correct=0,incorrect=0,missed=0,totalTime=0;
@@ -649,8 +609,7 @@
           if(elapsed>=Number(section.tiempo))break;
           const target=randomBetween(config.accuracyMin,config.accuracyMax);
           if(Math.random()<=target){
-            const extra=action.kind==="hold"?action.holdDuration:0;
-            if(elapsed+extra<=Number(section.tiempo)+1e-9){elapsed+=extra;correct++;completed=true;}else break;
+            correct++;completed=true;
           }else incorrect++;
         }
         if(!completed){missed+=actions.length-i;elapsed=Number(section.tiempo);break;}
@@ -700,7 +659,7 @@
       if(!confirmAction("Se reemplazarán los datos actuales. ¿Continuar?"))return;
       await mediaDB.clear();
       for(const item of payload.media||[])await mediaDB.put(dataUrlToBlob(item.dataUrl),{id:item.id,name:item.name,type:item.type});
-      state.cards=payload.state.cards;state.decks=payload.state.decks||{};state.playerDeck=payload.state.playerDeck||[];state.enemyDeck=payload.state.enemyDeck||[];state.settings={...defaultState().settings,...payload.state.settings};
+      state.cards=migrateCardsToTap(payload.state.cards);state.decks=payload.state.decks||{};state.playerDeck=payload.state.playerDeck||[];state.enemyDeck=payload.state.enemyDeck||[];state.settings={...defaultState().settings,...payload.state.settings};
       saveState("Respaldo importado");location.reload();
     }catch(error){console.error(error);toast(error.message||"No se pudo importar el respaldo.","error");}
   }
@@ -729,7 +688,7 @@
     $("#resetCardsButton").addEventListener("click",async()=>{
       if(!confirmAction("Se restaurarán las 100 cartas iniciales. Las imágenes asignadas a cartas se eliminarán."))return;
       const ids=state.cards.map(c=>c.imageId).filter(Boolean);for(const id of ids)await mediaDB.delete(id);
-      state.cards=clone(INITIAL.cards);state.decks={...clone(INITIAL.starterDecks),...state.decks};state.playerDeck=clone(INITIAL.starterDecks["Inicial Fácil"]);state.enemyDeck=clone(INITIAL.starterDecks["Inicial Medio"]);saveState();renderCards();renderDecks();toast("Cartas iniciales restauradas.");
+      state.cards=migrateCardsToTap(clone(INITIAL.cards));state.decks={...clone(INITIAL.starterDecks),...state.decks};state.playerDeck=clone(INITIAL.starterDecks["Inicial Fácil"]);state.enemyDeck=clone(INITIAL.starterDecks["Inicial Medio"]);saveState();renderCards();renderDecks();toast("Cartas iniciales restauradas.");
     });
 
     // El formulario usa botones controlados para evitar que la validación HTML cierre el diálogo antes de tiempo.
@@ -737,7 +696,6 @@
     $("#cardEditorForm").addEventListener("submit",event=>{event.preventDefault();saveEditor();});
     $("#cardEditorDialog").addEventListener("close",async()=>{if(!editor.saved&&editor.pendingImageId)await mediaDB.delete(editor.pendingImageId);});
     $("#editorCardName").addEventListener("input",updateEditorSummary);
-    $("#editorActionType").addEventListener("change",()=>$("#editorHoldDurationLabel").classList.toggle("hidden",$("#editorActionType").value!=="hold"));
     $("#addSectionButton").addEventListener("click",()=>{if(editor.card.secciones.length>=5)return;editor.card.secciones.push({nombre:`Sección ${editor.card.secciones.length+1}`,tiempo:1.2,botones:["A"]});editor.activeSection=editor.card.secciones.length-1;renderEditorSections();updateEditorSummary();});
     $("#editorSections").addEventListener("input",event=>{
       const field=event.target.dataset.field,index=Number(event.target.dataset.index);if(!field||!editor.card.secciones[index])return;

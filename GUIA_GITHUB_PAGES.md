@@ -11,7 +11,7 @@ TuRepositorio/
 ├── styles.css
 ├── README.md
 ├── GUIA_GITHUB_PAGES.md
-└── CAMBIOS_V8.md
+└── CAMBIOS_V8_1.md
 ```
 
 El archivo importante es `index.html`: debe quedar directamente en la raíz de la rama `main`.
@@ -21,7 +21,7 @@ El archivo importante es `index.html`: debe quedar directamente en la raíz de l
 1. Abre el repositorio.
 2. Pulsa **Add file → Upload files**.
 3. Arrastra todos los archivos de esta carpeta.
-4. Escribe un mensaje como `Publicar QTE Lab 8.0`.
+4. Escribe un mensaje como `Publicar QTE Lab 8.1`.
 5. Confirma con **Commit changes** sobre `main`.
 6. Ve a **Settings → Pages**.
 7. Selecciona **Deploy from a branch**.

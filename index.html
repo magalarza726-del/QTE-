@@ -14,7 +14,7 @@
     <header class="topbar">
       <button id="brandHome" class="brand" type="button" aria-label="Ir al inicio">
         <span class="brand-mark">Q</span>
-        <span><strong>QTE Lab</strong><small>GitHub Pages · v8</small></span>
+        <span><strong>QTE Lab</strong><small>GitHub Pages · v8.1</small></span>
       </button>
       <nav id="mainNav" class="main-nav" aria-label="Navegación principal">
         <button data-route="home" class="nav-button active">Inicio</button>
@@ -131,8 +131,7 @@
               <section class="qte-main panel-strong">
                 <div class="qte-header"><div><span class="eyebrow" id="qteSectionName">SECCIÓN</span><h2>Ejecuta la secuencia</h2></div><div class="timer-ring"><strong id="qteTimer">0.00</strong><small>seg</small></div></div>
                 <div id="qteSequence" class="qte-sequence"></div>
-                <div id="holdProgressWrap" class="hold-progress-wrap hidden"><span id="holdProgressLabel">HOLD</span><div class="hold-track"><span id="holdProgressFill"></span></div></div>
-                <p class="qte-hint">Usa clic o toque. En HOLD mantén presionado hasta completar la barra.</p>
+                <p class="qte-hint">Usa clic o toque. Cada pulsación correcta avanza inmediatamente en la secuencia.</p>
               </section>
               <section class="controller panel-strong" aria-label="Control Xbox visual">
                 <div class="trigger-row"><button data-qte="L2">L2</button><button data-qte="R2">R2</button></div>
@@ -171,7 +170,7 @@
             <h2>Vista previa de legibilidad</h2>
             <div id="mediaPreview" class="media-preview">
               <img id="previewBackgroundImage" class="battle-background-media hidden" alt=""><video id="previewBackgroundVideo" class="battle-background-media hidden" muted loop playsinline></video><div class="battle-veil"></div>
-              <div class="preview-ui panel-strong"><span class="eyebrow">SECCIÓN 2 · HOLD</span><h3>Ráfaga Cuántica</h3><div class="preview-sequence"><span>↑</span><span>A</span><span class="current">R1</span><span>Y</span></div><div class="preview-timer">2.47 s</div></div>
+              <div class="preview-ui panel-strong"><span class="eyebrow">SECCIÓN 2 · TAP</span><h3>Ráfaga Cuántica</h3><div class="preview-sequence"><span>↑</span><span>A</span><span class="current">R1</span><span>Y</span></div><div class="preview-timer">2.47 s</div></div>
             </div>
             <p class="muted">Prueba una imagen clara, una oscura y un video con mucho movimiento. Los datos deben seguir siendo el primer plano.</p>
           </article>
@@ -210,7 +209,7 @@
         </section>
         <aside class="editor-sidebar">
           <div class="panel summary-panel"><h3>Resumen</h3><dl><div><dt>Acciones</dt><dd id="summaryActions">0</dd></div><div><dt>Tiempo</dt><dd id="summaryTime">0.00 s</dd></div><div><dt>Mínimo humano</dt><dd id="summaryMinimum">0.00 s</dd></div><div><dt>Poder bruto</dt><dd id="summaryRawPower">0.000</dd></div><div><dt>Estrellas</dt><dd id="summaryStars">—</dd></div><div><dt>Coeficiente</dt><dd id="summaryCoefficient">0.0000</dd></div></dl></div>
-          <div class="panel action-builder"><h3>Agregar acción</h3><div id="editorButtonPad" class="editor-button-pad"></div><label><span>Tipo</span><select id="editorActionType"><option value="tap">Tap</option><option value="hold">Hold</option></select></label><label id="editorHoldDurationLabel" class="hidden"><span>Duración HOLD</span><input id="editorHoldDuration" type="number" min="1.5" max="3" step="0.1" value="1.8"></label><p class="muted">La acción se agrega a la sección marcada como activa.</p></div>
+          <div class="panel action-builder"><h3>Agregar pulsación</h3><div id="editorButtonPad" class="editor-button-pad"></div><p class="muted">Cada botón se agrega como una pulsación TAP a la sección marcada como activa.</p></div>
         </aside>
       </div>
       <p id="editorError" class="form-error hidden"></p>

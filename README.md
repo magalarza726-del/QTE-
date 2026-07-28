@@ -1,4 +1,4 @@
-# QTE Lab 8.0 · GitHub Pages
+# QTE Lab 8.1 · GitHub Pages
 
 Versión web estática de QTE Lab preparada para publicarse directamente en GitHub Pages. No necesita Python, Node.js, base de datos ni servidor propio.
 
@@ -49,8 +49,8 @@ El usuario puede desactivar esta protección manualmente desde **Multimedia**, p
 
 - 100 cartas iniciales.
 - Editor de cartas con 1 a 5 secciones.
-- Acciones TAP y HOLD de 1,5 a 3,0 segundos.
-- Validación del tiempo humano mínimo.
+- Acciones exclusivamente TAP: cada pulsación correcta avanza de inmediato.
+- Validación del tiempo humano mínimo usando 0,30 s por pulsación.
 - Imagen individual para cada carta.
 - Decks de 12 cartas y presets guardables.
 - Rival automático en dificultad Fácil, Normal o Difícil.
@@ -67,9 +67,6 @@ El usuario puede desactivar esta protección manualmente desde **Multimedia**, p
 ```text
 PoderBruto = NúmeroTotalDeAcciones / TiempoLímiteTotal
 
-Si la carta contiene HOLD:
-PoderBruto = PoderBruto + 0,05
-
 PoderNeto = (BotonesCorrectos / TiempoReal) × (1 + Coeficiente)
 
 Coeficiente = sqrt(N² / suma(frecuencia²)) / 10
@@ -80,3 +77,7 @@ Daño = PoderNeto
 ## Navegadores recomendados
 
 Chrome, Edge, Firefox o Safari en versiones modernas. Para conservar archivos multimedia, el navegador debe permitir IndexedDB y almacenamiento local.
+
+## Migración desde QTE Lab 8.0
+
+Al abrir esta versión, cualquier acción HOLD presente en cartas guardadas o respaldos antiguos se convierte automáticamente en una pulsación TAP del mismo botón. Las imágenes, decks y ajustes se conservan.
