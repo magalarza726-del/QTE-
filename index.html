@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07111f">
+  <meta name="description" content="QTE Lab: editor de cartas, construcción de decks y combate QTE totalmente estático para GitHub Pages.">
+  <title>QTE Lab · GitHub Pages</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <noscript><div class="noscript">QTE Lab necesita JavaScript activado.</div></noscript>
+  <div id="app" class="app-shell">
+    <header class="topbar">
+      <button id="brandHome" class="brand" type="button" aria-label="Ir al inicio">
+        <span class="brand-mark">Q</span>
+        <span><strong>QTE Lab</strong><small>GitHub Pages · v8</small></span>
+      </button>
+      <nav id="mainNav" class="main-nav" aria-label="Navegación principal">
+        <button data-route="home" class="nav-button active">Inicio</button>
+        <button data-route="cards" class="nav-button">Cartas</button>
+        <button data-route="decks" class="nav-button">Decks</button>
+        <button data-route="battle" class="nav-button">Batalla</button>
+        <button data-route="media" class="nav-button">Multimedia</button>
+        <button data-route="data" class="nav-button">Datos</button>
+      </nav>
+      <div class="topbar-actions">
+        <span id="saveStatus" class="save-status">Guardado local</span>
+      </div>
+    </header>
+
+    <main>
+      <section id="page-home" class="page active" data-page="home">
+        <div class="hero panel">
+          <div>
+            <span class="eyebrow">PROTOTIPO WEB AUTÓNOMO</span>
+            <h1>Diseña cartas. Construye decks. Juega sin servidor.</h1>
+            <p>Esta edición funciona como un sitio estático: <strong>index.html</strong> carga <strong>main.js</strong>, conserva las 100 cartas iniciales y guarda tus cambios dentro del navegador.</p>
+            <div class="hero-actions">
+              <button class="primary" data-go="cards">Abrir desarrollador</button>
+              <button class="secondary" data-go="decks">Preparar batalla</button>
+            </div>
+          </div>
+          <div class="hero-orb" aria-hidden="true"><span>QTE</span></div>
+        </div>
+        <div class="stats-grid">
+          <article class="stat-card panel"><span id="homeCardCount">100</span><small>Cartas disponibles</small></article>
+          <article class="stat-card panel"><span id="homeDeckCount">3</span><small>Decks guardados</small></article>
+          <article class="stat-card panel"><span>12</span><small>Controles Xbox</small></article>
+          <article class="stat-card panel"><span>100%</span><small>Estático y portable</small></article>
+        </div>
+        <div class="feature-grid">
+          <article class="panel feature-card"><span class="feature-icon">▣</span><h2>Arte sin interferencias</h2><p>Cada imagen vive en un marco independiente. Nunca cubre estadísticas, secuencias, botones ni temporizadores.</p></article>
+          <article class="panel feature-card"><span class="feature-icon">◐</span><h2>Fondo con protección</h2><p>La imagen o el video de batalla queda detrás de una capa regulable. El modo seguro limita automáticamente la intensidad visual.</p></article>
+          <article class="panel feature-card"><span class="feature-icon">◇</span><h2>Persistencia real</h2><p>Cartas, decks y ajustes usan almacenamiento local; imágenes, videos y audio usan IndexedDB para evitar el límite pequeño de localStorage.</p></article>
+        </div>
+      </section>
+
+      <section id="page-cards" class="page" data-page="cards">
+        <div class="page-heading">
+          <div><span class="eyebrow">MODO DESARROLLADOR</span><h1>Biblioteca de cartas</h1><p>Edita mecánicas y asigna una imagen individual a cada carta.</p></div>
+          <button id="newCardButton" class="primary">＋ Nueva carta</button>
+        </div>
+        <div class="toolbar panel">
+          <label class="search-field"><span>Buscar</span><input id="cardSearch" type="search" placeholder="Nombre de carta"></label>
+          <label><span>Estrellas</span><select id="starFilter"><option value="all">Todas</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option></select></label>
+          <label><span>Arte</span><select id="imageFilter"><option value="all">Todas</option><option value="with">Con imagen</option><option value="without">Sin imagen</option></select></label>
+          <button id="resetCardsButton" class="ghost danger-text">Restaurar cartas iniciales</button>
+        </div>
+        <div id="cardsGrid" class="cards-grid" aria-live="polite"></div>
+        <p id="cardsEmpty" class="empty-state hidden">No hay cartas que coincidan con los filtros.</p>
+      </section>
+
+      <section id="page-decks" class="page" data-page="decks">
+        <div class="page-heading">
+          <div><span class="eyebrow">CONFIGURACIÓN</span><h1>Decks de combate</h1><p>Cada lado necesita exactamente 12 cartas. Puedes guardar tus propias combinaciones.</p></div>
+          <button id="launchBattleButton" class="primary">INICIAR COMBATE</button>
+        </div>
+        <div class="battle-config panel">
+          <label><span>Dificultad rival</span><select id="difficultySelect"><option>Fácil</option><option selected>Normal</option><option>Difícil</option></select></label>
+          <label><span>Música</span><select id="musicSelect"><option value="">Sin música</option></select></label>
+          <label class="range-label"><span>Volumen <output id="musicVolumeOutput">35%</output></span><input id="musicVolume" type="range" min="0" max="100" value="35"></label>
+        </div>
+        <div class="deck-layout">
+          <article class="deck-builder panel" data-side="player">
+            <div class="deck-header"><div><span class="eyebrow">JUGADOR</span><h2>Tu deck</h2></div><span id="playerDeckCount" class="count-pill">12 / 12</span></div>
+            <div class="deck-tools">
+              <select id="playerPresetSelect"></select><button id="loadPlayerPreset" class="secondary">Cargar</button><button id="randomPlayerDeck" class="ghost">Aleatorio</button>
+            </div>
+            <div id="playerDeckSlots" class="deck-slots"></div>
+            <div class="save-deck-row"><input id="playerDeckName" placeholder="Nombre del deck"><button id="savePlayerDeck" class="secondary">Guardar deck</button></div>
+          </article>
+          <article class="deck-builder panel" data-side="enemy">
+            <div class="deck-header"><div><span class="eyebrow">RIVAL</span><h2>Deck enemigo</h2></div><span id="enemyDeckCount" class="count-pill">12 / 12</span></div>
+            <div class="deck-tools">
+              <select id="enemyPresetSelect"></select><button id="loadEnemyPreset" class="secondary">Cargar</button><button id="randomEnemyDeck" class="ghost">Aleatorio</button>
+            </div>
+            <div id="enemyDeckSlots" class="deck-slots"></div>
+            <div class="save-deck-row"><input id="enemyDeckName" placeholder="Nombre del deck"><button id="saveEnemyDeck" class="secondary">Guardar deck</button></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="page-battle" class="page battle-page" data-page="battle">
+        <div id="battleStage" class="battle-stage">
+          <img id="battleBackgroundImage" class="battle-background-media hidden" alt="">
+          <video id="battleBackgroundVideo" class="battle-background-media hidden" muted loop playsinline></video>
+          <div class="battle-veil" aria-hidden="true"></div>
+          <div class="battle-content">
+            <div class="battle-topbar panel-strong">
+              <div class="health-block"><strong>JUGADOR</strong><div class="health-track"><span id="playerHealthFill"></span></div><small id="playerHealthText">20.0 / 20</small></div>
+              <div class="turn-block"><span id="battleTurnLabel">TURNO 1</span><strong id="battlePhaseLabel">PREPARADO</strong></div>
+              <div class="health-block enemy"><strong>RIVAL</strong><div class="health-track"><span id="enemyHealthFill"></span></div><small id="enemyHealthText">20.0 / 20</small></div>
+            </div>
+
+            <div id="battleIdle" class="battle-center panel-strong">
+              <span class="eyebrow">ARENA QTE</span><h1>La batalla está lista</h1><p>Configura tus decks y pulsa iniciar. El fondo permanecerá visualmente subordinado a las mecánicas.</p><button id="battleGoDecks" class="primary">Configurar decks</button>
+            </div>
+
+            <div id="battleSelection" class="battle-center hidden">
+              <div class="selection-heading panel-strong"><span class="eyebrow">ELIGE UNA CARTA</span><h2 id="selectionTurnText">Turno 1</h2><p>Las imágenes se muestran dentro de su propio marco y no invaden los datos.</p></div>
+              <div id="battleHand" class="battle-hand"></div>
+            </div>
+
+            <div id="battleQte" class="qte-layout hidden">
+              <aside class="active-card-panel panel-strong">
+                <div id="activeCardArt" class="active-card-art"><span>Sin arte</span></div>
+                <span class="eyebrow">CARTA ACTIVA</span><h2 id="activeCardName">—</h2>
+                <div class="mini-stats"><span>PB <strong id="activeRawPower">0</strong></span><span>★ <strong id="activeStars">0</strong></span></div>
+              </aside>
+              <section class="qte-main panel-strong">
+                <div class="qte-header"><div><span class="eyebrow" id="qteSectionName">SECCIÓN</span><h2>Ejecuta la secuencia</h2></div><div class="timer-ring"><strong id="qteTimer">0.00</strong><small>seg</small></div></div>
+                <div id="qteSequence" class="qte-sequence"></div>
+                <div id="holdProgressWrap" class="hold-progress-wrap hidden"><span id="holdProgressLabel">HOLD</span><div class="hold-track"><span id="holdProgressFill"></span></div></div>
+                <p class="qte-hint">Usa clic o toque. En HOLD mantén presionado hasta completar la barra.</p>
+              </section>
+              <section class="controller panel-strong" aria-label="Control Xbox visual">
+                <div class="trigger-row"><button data-qte="L2">L2</button><button data-qte="R2">R2</button></div>
+                <div class="trigger-row"><button data-qte="L1">L1</button><button data-qte="R1">R1</button></div>
+                <div class="controller-main">
+                  <div class="dpad">
+                    <button data-qte="UP" class="up">↑</button><button data-qte="LEFT" class="left">←</button><span class="dpad-center"></span><button data-qte="RIGHT" class="right">→</button><button data-qte="DOWN" class="down">↓</button>
+                  </div>
+                  <div class="controller-core"><span>QTE</span></div>
+                  <div class="face-buttons"><button data-qte="Y" class="btn-y">Y</button><button data-qte="X" class="btn-x">X</button><button data-qte="B" class="btn-b">B</button><button data-qte="A" class="btn-a">A</button></div>
+                </div>
+              </section>
+            </div>
+
+            <div id="battleResult" class="battle-center panel-strong hidden">
+              <span class="eyebrow">RESULTADO DEL TURNO</span><h2 id="resultHeadline">—</h2><div id="resultMetrics" class="result-metrics"></div><button id="continueBattleButton" class="primary">Siguiente turno</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-media" class="page" data-page="media">
+        <div class="page-heading"><div><span class="eyebrow">APARIENCIA DE BATALLA</span><h1>Imagen, video y transparencia</h1><p>Personaliza el escenario sin sacrificar la lectura de las mecánicas.</p></div></div>
+        <div class="media-layout">
+          <article class="panel media-controls">
+            <h2>Fondo de batalla</h2>
+            <div class="upload-row"><label class="file-button">Adjuntar imagen<input id="backgroundImageInput" type="file" accept="image/*"></label><label class="file-button">Adjuntar video<input id="backgroundVideoInput" type="file" accept="video/*"></label><button id="removeBackgroundButton" class="ghost danger-text">Quitar fondo</button></div>
+            <p id="backgroundFileName" class="muted">Sin archivo cargado.</p>
+            <label class="toggle-row"><input id="safeModeToggle" type="checkbox" checked><span><strong>Protección de legibilidad</strong><small>Limita la visibilidad del fondo y refuerza el contraste de los paneles.</small></span></label>
+            <label class="range-label"><span>Visibilidad del fondo <output id="backgroundOpacityOutput">25%</output></span><input id="backgroundOpacity" type="range" min="0" max="100" value="25"></label>
+            <label class="range-label"><span>Capa oscura <output id="overlayOpacityOutput">68%</output></span><input id="overlayOpacity" type="range" min="0" max="90" value="68"></label>
+            <label class="range-label"><span>Desenfoque <output id="backgroundBlurOutput">2 px</output></span><input id="backgroundBlur" type="range" min="0" max="16" value="2"></label>
+            <div id="safeModeNotice" class="notice success">Modo seguro activo: el fondo nunca superará 35% y la capa oscura nunca bajará de 55%.</div>
+          </article>
+          <article class="panel media-preview-card">
+            <h2>Vista previa de legibilidad</h2>
+            <div id="mediaPreview" class="media-preview">
+              <img id="previewBackgroundImage" class="battle-background-media hidden" alt=""><video id="previewBackgroundVideo" class="battle-background-media hidden" muted loop playsinline></video><div class="battle-veil"></div>
+              <div class="preview-ui panel-strong"><span class="eyebrow">SECCIÓN 2 · HOLD</span><h3>Ráfaga Cuántica</h3><div class="preview-sequence"><span>↑</span><span>A</span><span class="current">R1</span><span>Y</span></div><div class="preview-timer">2.47 s</div></div>
+            </div>
+            <p class="muted">Prueba una imagen clara, una oscura y un video con mucho movimiento. Los datos deben seguir siendo el primer plano.</p>
+          </article>
+          <article class="panel media-controls">
+            <h2>Música de combate</h2>
+            <div class="upload-row"><label class="file-button">Adjuntar audio<input id="musicInput" type="file" accept="audio/*"></label><button id="removeMusicButton" class="ghost danger-text">Eliminar pista</button></div>
+            <p id="musicFileName" class="muted">Sin audio cargado.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="page-data" class="page" data-page="data">
+        <div class="page-heading"><div><span class="eyebrow">PORTABILIDAD</span><h1>Datos y respaldo</h1><p>GitHub Pages no escribe archivos en el repositorio. Por eso el contenido se conserva en este navegador y puede exportarse.</p></div></div>
+        <div class="data-grid">
+          <article class="panel data-card"><h2>Exportar respaldo completo</h2><p>Incluye cartas, decks, ajustes, imágenes, video de fondo y audio. Los archivos grandes producen un JSON grande.</p><button id="exportBackupButton" class="primary">Descargar respaldo</button></article>
+          <article class="panel data-card"><h2>Importar respaldo</h2><p>Restaura una copia creada por esta misma versión. Los datos actuales serán reemplazados.</p><label class="file-button full">Seleccionar respaldo<input id="importBackupInput" type="file" accept="application/json,.json"></label></article>
+          <article class="panel data-card"><h2>Restauración</h2><p>Vuelve a las 100 cartas y los tres decks iniciales. También puedes borrar toda la multimedia local.</p><div class="stack-actions"><button id="resetEverythingButton" class="danger">Restaurar aplicación</button><button id="clearMediaButton" class="ghost danger-text">Borrar solo multimedia</button></div></article>
+          <article class="panel data-card"><h2>Entrada de GitHub Pages</h2><p><code>index.html</code> es el documento principal y <code>main.js</code> es el punto de entrada de la aplicación. Todo usa rutas relativas.</p><div class="code-note">./index.html → ./data.js → ./main.js</div></article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="cardEditorDialog" class="editor-dialog">
+    <form method="dialog" id="cardEditorForm">
+      <div class="dialog-header"><div><span class="eyebrow">EDITOR DE CARTA</span><h2 id="editorTitle">Nueva carta</h2></div><button value="cancel" class="icon-button" aria-label="Cerrar">×</button></div>
+      <div class="editor-grid">
+        <section class="editor-main">
+          <label><span>Nombre</span><input id="editorCardName" required maxlength="80"></label>
+          <div class="editor-art-row">
+            <div id="editorArtPreview" class="editor-art-preview"><span>Sin imagen</span></div>
+            <div><label class="file-button">Adjuntar imagen<input id="editorImageInput" type="file" accept="image/*"></label><button id="editorRemoveImage" type="button" class="ghost danger-text">Quitar imagen</button><p class="muted">El arte se recorta con <code>object-fit: cover</code> dentro de un marco fijo. No se superpone a las mecánicas.</p></div>
+          </div>
+          <div class="section-toolbar"><h3>Secciones</h3><button id="addSectionButton" type="button" class="secondary">＋ Agregar sección</button></div>
+          <div id="editorSections" class="editor-sections"></div>
+        </section>
+        <aside class="editor-sidebar">
+          <div class="panel summary-panel"><h3>Resumen</h3><dl><div><dt>Acciones</dt><dd id="summaryActions">0</dd></div><div><dt>Tiempo</dt><dd id="summaryTime">0.00 s</dd></div><div><dt>Mínimo humano</dt><dd id="summaryMinimum">0.00 s</dd></div><div><dt>Poder bruto</dt><dd id="summaryRawPower">0.000</dd></div><div><dt>Estrellas</dt><dd id="summaryStars">—</dd></div><div><dt>Coeficiente</dt><dd id="summaryCoefficient">0.0000</dd></div></dl></div>
+          <div class="panel action-builder"><h3>Agregar acción</h3><div id="editorButtonPad" class="editor-button-pad"></div><label><span>Tipo</span><select id="editorActionType"><option value="tap">Tap</option><option value="hold">Hold</option></select></label><label id="editorHoldDurationLabel" class="hidden"><span>Duración HOLD</span><input id="editorHoldDuration" type="number" min="1.5" max="3" step="0.1" value="1.8"></label><p class="muted">La acción se agrega a la sección marcada como activa.</p></div>
+        </aside>
+      </div>
+      <p id="editorError" class="form-error hidden"></p>
+      <div class="dialog-actions"><button value="cancel" class="ghost">Cancelar</button><button id="saveCardButton" value="default" class="primary">Guardar carta</button></div>
+    </form>
+  </dialog>
+
+  <div id="toastRegion" class="toast-region" aria-live="polite"></div>
+  <audio id="battleMusic" loop></audio>
+  <script src="./data.js"></script>
+  <script src="./main.js"></script>
+</body>
+</html>
