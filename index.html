@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#07111f">
-  <meta name="description" content="QTE Lab: editor de cartas, construcción de decks y combate QTE totalmente estático para GitHub Pages.">
+  <meta name="description" content="QTE Lab: juego estratégico de cartas, emblemas y combate QTE con animaciones procedurales para GitHub Pages.">
   <title>QTE Lab · GitHub Pages</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -14,17 +14,27 @@
     <header class="topbar">
       <button id="brandHome" class="brand" type="button" aria-label="Ir al inicio">
         <span class="brand-mark">Q</span>
-        <span><strong>QTE Lab</strong><small>GitHub Pages · v8.1</small></span>
+        <span><strong>QTE Lab</strong><small>GitHub Pages · v10.0</small></span>
       </button>
       <nav id="mainNav" class="main-nav" aria-label="Navegación principal">
         <button data-route="home" class="nav-button active">Inicio</button>
         <button data-route="cards" class="nav-button">Cartas</button>
+        <button data-route="emblems" class="nav-button">Emblemas</button>
         <button data-route="decks" class="nav-button">Decks</button>
         <button data-route="battle" class="nav-button">Batalla</button>
         <button data-route="media" class="nav-button">Multimedia</button>
         <button data-route="data" class="nav-button">Datos</button>
       </nav>
       <div class="topbar-actions">
+        <div class="layout-switcher" title="Seleccionar diseño de interfaz">
+          <span id="layoutModeBadge" class="layout-mode-badge">Auto</span>
+          <select id="layoutModeSelect" aria-label="Modo de interfaz">
+            <option value="auto">Automático</option>
+            <option value="desktop">Escritorio</option>
+            <option value="mobile-portrait">Móvil vertical</option>
+            <option value="mobile-landscape">Móvil horizontal</option>
+          </select>
+        </div>
         <span id="saveStatus" class="save-status">Guardado local</span>
       </div>
     </header>
@@ -33,12 +43,12 @@
       <section id="page-home" class="page active" data-page="home">
         <div class="hero panel">
           <div>
-            <span class="eyebrow">PROTOTIPO WEB AUTÓNOMO</span>
+            <span class="eyebrow">JUEGO ESTRATÉGICO QTE</span>
             <h1>Diseña cartas. Construye decks. Juega sin servidor.</h1>
-            <p>Esta edición funciona como un sitio estático: <strong>index.html</strong> carga <strong>main.js</strong>, conserva las 100 cartas iniciales y guarda tus cambios dentro del navegador.</p>
+            <p>Construye un mazo de 12 cartas, combina hasta cuatro emblemas y adapta tu ejecución a encantamientos aleatorios. Todo funciona como sitio estático y guarda los cambios dentro del navegador.</p>
             <div class="hero-actions">
               <button class="primary" data-go="cards">Abrir desarrollador</button>
-              <button class="secondary" data-go="decks">Preparar batalla</button>
+              <button class="secondary" data-go="emblems">Preparar batalla</button>
             </div>
           </div>
           <div class="hero-orb" aria-hidden="true"><span>QTE</span></div>
@@ -71,6 +81,29 @@
         <p id="cardsEmpty" class="empty-state hidden">No hay cartas que coincidan con los filtros.</p>
       </section>
 
+
+      <section id="page-emblems" class="page" data-page="emblems">
+        <div class="page-heading">
+          <div><span class="eyebrow">ESTRATEGIA PREVIA</span><h1>Selección de Emblemas</h1><p>Cada jugador equipa entre 1 y 4 clanes. Al iniciar la partida, las 12 posiciones del deck se encantan de forma aleatoria y sin repeticiones.</p></div>
+          <button id="continueToDecksButton" class="primary">CONTINUAR A DECKS</button>
+        </div>
+        <div class="emblem-rules panel">
+          <strong>Distribución automática</strong>
+          <span>1 emblema: 12 cartas</span><span>2: 6 por emblema</span><span>3: 4 por emblema</span><span>4: 3 por emblema</span>
+        </div>
+        <div class="emblem-player-layout">
+          <article class="panel emblem-selector-card" data-emblem-side="player">
+            <div class="deck-header"><div><span class="eyebrow">JUGADOR</span><h2>Tus emblemas</h2></div><span id="playerEmblemCount" class="count-pill">1 / 4</span></div>
+            <div id="playerEmblemGrid" class="emblem-grid"></div>
+          </article>
+          <article class="panel emblem-selector-card" data-emblem-side="enemy">
+            <div class="deck-header"><div><span class="eyebrow">RIVAL</span><h2>Emblemas enemigos</h2></div><span id="enemyEmblemCount" class="count-pill">1 / 4</span></div>
+            <div id="enemyEmblemGrid" class="emblem-grid"></div>
+          </article>
+        </div>
+        <div class="notice success">Los encantamientos se revelan desde el comienzo del combate. Cada posición del mazo recibe exactamente un emblema.</div>
+      </section>
+
       <section id="page-decks" class="page" data-page="decks">
         <div class="page-heading">
           <div><span class="eyebrow">CONFIGURACIÓN</span><h1>Decks de combate</h1><p>Cada lado necesita exactamente 12 cartas. Puedes guardar tus propias combinaciones.</p></div>
@@ -80,6 +113,10 @@
           <label><span>Dificultad rival</span><select id="difficultySelect"><option>Fácil</option><option selected>Normal</option><option>Difícil</option></select></label>
           <label><span>Música</span><select id="musicSelect"><option value="">Sin música</option></select></label>
           <label class="range-label"><span>Volumen <output id="musicVolumeOutput">35%</output></span><input id="musicVolume" type="range" min="0" max="100" value="35"></label>
+        </div>
+        <div class="deck-enchantment-preview panel">
+          <div><span class="eyebrow">ENCANTAMIENTOS DE ESTA PARTIDA</span><h2>Vista previa aleatoria</h2><p id="deckEmblemSummary">Selecciona emblemas para preparar la distribución.</p></div>
+          <div class="deck-preview-actions"><button id="rerollEnchantmentsButton" class="secondary">Sortear encantamientos</button><button id="backToEmblemsButton" class="ghost">Cambiar emblemas</button></div>
         </div>
         <div class="deck-layout">
           <article class="deck-builder panel" data-side="player">
@@ -119,6 +156,7 @@
 
             <div id="battleSelection" class="battle-center hidden">
               <div class="selection-heading panel-strong"><span class="eyebrow">ELIGE UNA CARTA</span><h2 id="selectionTurnText">Turno 1</h2><p>Las imágenes se muestran dentro de su propio marco y no invaden los datos.</p></div>
+              <details id="battleEnchantmentManifest" class="battle-enchantment-manifest panel-strong" open><summary>Encantamientos completos del mazo</summary><div id="battleManifestCards" class="battle-manifest-cards"></div></details>
               <div id="battleHand" class="battle-hand"></div>
             </div>
 
@@ -126,7 +164,17 @@
               <aside class="active-card-panel panel-strong">
                 <div id="activeCardArt" class="active-card-art"><span>Sin arte</span></div>
                 <span class="eyebrow">CARTA ACTIVA</span><h2 id="activeCardName">—</h2>
-                <div class="mini-stats"><span>PB <strong id="activeRawPower">0</strong></span><span>★ <strong id="activeStars">0</strong></span></div>
+                <div id="activeEmblemBadge" class="active-emblem-badge">Sin emblema</div>
+                <div class="battle-live-stats">
+                  <span>Poder Bruto<strong id="activeRawPower">0</strong></span>
+                  <span>Poder Neto<strong id="liveNetPower">0.000</strong></span>
+                  <span>Coeficiente<strong id="liveCoefficient">0.000</strong></span>
+                  <span>Tiempo restante<strong id="liveTimeRemaining">0.00 s</strong></span>
+                  <span>Correctos<strong id="liveCorrect">0</strong></span>
+                  <span>Incorrectos<strong id="liveIncorrect">0</strong></span>
+                  <span>Precisión<strong id="liveAccuracy">0.0%</strong></span>
+                  <span>Estrellas<strong id="activeStars">0</strong></span>
+                </div>
               </aside>
               <section class="qte-main panel-strong">
                 <div class="qte-header"><div><span class="eyebrow" id="qteSectionName">SECCIÓN</span><h2>Ejecuta la secuencia</h2></div><div class="timer-ring"><strong id="qteTimer">0.00</strong><small>seg</small></div></div>
@@ -144,6 +192,17 @@
                   <div class="face-buttons"><button data-qte="Y" class="btn-y">Y</button><button data-qte="X" class="btn-x">X</button><button data-qte="B" class="btn-b">B</button><button data-qte="A" class="btn-a">A</button></div>
                 </div>
               </section>
+            </div>
+
+            <div id="battleAnimation" class="battle-animation-view hidden" aria-live="polite">
+              <canvas id="combatAnimationCanvas" class="combat-animation-canvas" aria-label="Animación procedural del combate"></canvas>
+              <div class="animation-combat-hud panel-strong">
+                <span><small>Carta utilizada</small><strong id="animationCardName">—</strong></span>
+                <span><small>Emblema activo</small><strong id="animationEmblemName">—</strong></span>
+                <span><small>Precisión</small><strong id="animationAccuracy">0.0%</strong></span>
+                <span><small>Poder Neto</small><strong id="animationNetPower">0.000</strong></span>
+              </div>
+              <div id="animationTechniqueLabel" class="animation-technique-label">TÉCNICA</div>
             </div>
 
             <div id="battleResult" class="battle-center panel-strong hidden">
@@ -188,7 +247,8 @@
           <article class="panel data-card"><h2>Exportar respaldo completo</h2><p>Incluye cartas, decks, ajustes, imágenes, video de fondo y audio. Los archivos grandes producen un JSON grande.</p><button id="exportBackupButton" class="primary">Descargar respaldo</button></article>
           <article class="panel data-card"><h2>Importar respaldo</h2><p>Restaura una copia creada por esta misma versión. Los datos actuales serán reemplazados.</p><label class="file-button full">Seleccionar respaldo<input id="importBackupInput" type="file" accept="application/json,.json"></label></article>
           <article class="panel data-card"><h2>Restauración</h2><p>Vuelve a las 100 cartas y los tres decks iniciales. También puedes borrar toda la multimedia local.</p><div class="stack-actions"><button id="resetEverythingButton" class="danger">Restaurar aplicación</button><button id="clearMediaButton" class="ghost danger-text">Borrar solo multimedia</button></div></article>
-          <article class="panel data-card"><h2>Entrada de GitHub Pages</h2><p><code>index.html</code> es el documento principal y <code>main.js</code> es el punto de entrada de la aplicación. Todo usa rutas relativas.</p><div class="code-note">./index.html → ./data.js → ./main.js</div></article>
+          <article class="panel data-card"><h2>Entrada de GitHub Pages</h2><p><code>index.html</code> es el documento principal y <code>main.js</code> es el punto de entrada de la aplicación. Todo usa rutas relativas.</p><div class="code-note">./index.html → data.js → animation/* → characters/* → effects/* → combat/* → game-systems.js → emblem-system.js → main.js</div></article>
+          <article class="panel data-card"><h2>Tres diseños adaptativos</h2><p>La interfaz puede detectar automáticamente el dispositivo o forzar los modos Escritorio, Móvil vertical y Móvil horizontal. La selección manual se conserva entre sesiones.</p><div class="code-note">auto → desktop | mobile-portrait | mobile-landscape</div></article>
         </div>
       </section>
     </main>
@@ -197,6 +257,8 @@
   <dialog id="cardEditorDialog" class="editor-dialog">
     <form method="dialog" id="cardEditorForm">
       <div class="dialog-header"><div><span class="eyebrow">EDITOR DE CARTA</span><h2 id="editorTitle">Nueva carta</h2></div><button value="cancel" class="icon-button" aria-label="Cerrar">×</button></div>
+      <div class="editor-tabs" role="tablist"><button type="button" class="active" data-editor-tab="mechanics">Mecánicas</button><button type="button" data-editor-tab="animation">Animación</button><button type="button" data-editor-tab="statistics">Estadísticas</button></div>
+      <div id="editorMechanicsTab" class="editor-tab-panel active">
       <div class="editor-grid">
         <section class="editor-main">
           <label><span>Nombre</span><input id="editorCardName" required maxlength="80"></label>
@@ -212,6 +274,40 @@
           <div class="panel action-builder"><h3>Agregar pulsación</h3><div id="editorButtonPad" class="editor-button-pad"></div><p class="muted">Cada botón se agrega como una pulsación TAP a la sección marcada como activa.</p></div>
         </aside>
       </div>
+      </div>
+      <div id="editorAnimationTab" class="editor-tab-panel">
+        <div class="animation-editor-layout">
+          <section class="panel animation-editor-controls">
+            <div><span class="eyebrow">TÉCNICA PROCEDURAL</span><h3>Animación de la carta</h3><p>La carta referencia una animación reutilizable. Ningún sprite forma parte de la lógica.</p></div>
+            <div class="animation-control-grid">
+              <label><span>Tipo de animación</span><select id="animationTypeSelect"></select></label>
+              <label><span>Velocidad</span><input id="animationSpeed" type="number" min="0.25" max="3" step="0.05"></label>
+              <label><span>Distancia recorrida</span><input id="animationDistance" type="number" min="0" max="500" step="5"></label>
+              <label><span>Número de impactos</span><input id="animationImpacts" type="number" min="1" max="8" step="1"></label>
+              <label><span>Duración</span><input id="animationDuration" type="number" min="0.2" max="4" step="0.05"></label>
+              <label><span>Altura del salto</span><input id="animationJumpHeight" type="number" min="0" max="280" step="5"></label>
+              <label><span>Tamaño del efecto</span><input id="animationEffectSize" type="number" min="0.2" max="3" step="0.05"></label>
+              <label><span>Longitud de la estela</span><input id="animationTrailLength" type="number" min="0" max="2" step="0.05"></label>
+              <label><span>Sacudida de cámara</span><input id="animationCameraShake" type="number" min="0" max="2" step="0.05"></label>
+              <label><span>Sonido procedural</span><select id="animationSound"><option value="none">Sin sonido</option><option value="impact">Impacto</option><option value="energy">Energía</option><option value="slash">Corte</option><option value="blast">Explosión</option></select></label>
+              <label><span>Emblema de prueba</span><select id="animationPreviewEmblem"></select></label>
+              <label><span>Precisión de prueba</span><input id="animationPreviewAccuracy" type="range" min="0" max="100" value="96"><output id="animationPreviewAccuracyOutput">96%</output></label>
+            </div>
+            <button id="previewAnimationButton" type="button" class="primary">Previsualizar</button>
+          </section>
+          <section class="panel animation-preview-panel">
+            <div><span class="eyebrow">PREVISUALIZACIÓN</span><h3 id="animationPreviewTitle">Golpe recto</h3><p>Manos y pies adoptan el color del emblema. El color del ataque responde a la precisión.</p></div>
+            <div class="animation-preview-stage"><canvas id="animationPreviewCanvas" aria-label="Previsualización procedural"></canvas></div>
+            <div class="precision-legend"><span style="--tier:#ff2b2b">&lt;20%</span><span style="--tier:#ff8a1f">20–39%</span><span style="--tier:#ffd629">40–59%</span><span style="--tier:#43e36d">60–79%</span><span style="--tier:#22e2cc">80–89%</span><span style="--tier:#69dfff">90–100%</span></div>
+          </section>
+        </div>
+      </div>
+      <div id="editorStatisticsTab" class="editor-tab-panel">
+        <section class="panel card-statistics-panel">
+          <div><span class="eyebrow">SOLO LECTURA</span><h3>Rendimiento histórico de la carta</h3><p>Estos valores se actualizan automáticamente al usar la carta en combate.</p></div>
+          <dl id="editorStatisticsList" class="statistics-list"></dl>
+        </section>
+      </div>
       <p id="editorError" class="form-error hidden"></p>
       <div class="dialog-actions"><button value="cancel" class="ghost">Cancelar</button><button id="saveCardButton" value="default" class="primary">Guardar carta</button></div>
     </form>
@@ -220,6 +316,15 @@
   <div id="toastRegion" class="toast-region" aria-live="polite"></div>
   <audio id="battleMusic" loop></audio>
   <script src="./data.js"></script>
+  <script src="./animation/animation-registry.js"></script>
+  <script src="./particles/particle-pool.js"></script>
+  <script src="./camera/camera-controller.js"></script>
+  <script src="./characters/stickman.js"></script>
+  <script src="./effects/effect-system.js"></script>
+  <script src="./game-systems.js"></script>
+  <script src="./emblem-system.js"></script>
+  <script src="./emblems/visual-emblems.js"></script>
+  <script src="./combat/combat-visuals.js"></script>
   <script src="./main.js"></script>
 </body>
 </html>

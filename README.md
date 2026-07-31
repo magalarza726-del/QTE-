@@ -1,83 +1,61 @@
-# QTE Lab 8.1 · GitHub Pages
+# QTE Lab v10.0 — Animaciones procedurales
 
-Versión web estática de QTE Lab preparada para publicarse directamente en GitHub Pages. No necesita Python, Node.js, base de datos ni servidor propio.
+Juego web estático de construcción de mazos, Emblemas y combate QTE, compatible con GitHub Pages.
 
-## Archivos principales
+## Novedades principales
 
-- `index.html`: página principal que GitHub Pages abre automáticamente.
-- `main.js`: punto de entrada y lógica completa de la aplicación.
-- `styles.css`: interfaz y diseño adaptable.
-- `data.js`: las 100 cartas y los tres decks iniciales.
-- `.nojekyll`: evita que GitHub procese o excluya archivos mediante Jekyll.
+- Quince técnicas reutilizables generadas completamente mediante código.
+- Personajes tipo stickman construidos por partes independientes.
+- Manos y pies coloreados según el Emblema activo.
+- Seis niveles visuales vinculados a la precisión del QTE.
+- Partículas, estelas, destellos, retroceso, zoom y sacudida de cámara.
+- Efectos visuales independientes para los ocho clanes.
+- Pestaña **Animación** en el editor de cartas.
+- Previsualización sin iniciar una batalla.
+- Sonidos procedurales mediante Web Audio.
+- Pools reutilizables de partículas y estelas.
+- Arquitectura preparada para sustituir el stickman por sprites mediante un adaptador de personaje.
 
-Todos los enlaces son relativos (`./archivo`), por lo que funciona tanto en un dominio de usuario como en un repositorio de proyecto.
+## Funciones conservadas
+
+- 100 cartas iniciales editables.
+- Decks de 12 cartas.
+- Ocho Emblemas estratégicos y encantamientos aleatorios.
+- Poder Bruto, Poder Neto y coeficiente de diversidad.
+- Estadísticas persistentes por carta.
+- Imagen individual por carta.
+- Fondo de batalla en imagen o video y transparencia regulable.
+- Música personalizada.
+- `localStorage`, `IndexedDB` y respaldos completos.
+- Escritorio, móvil vertical y móvil horizontal.
+- Entradas TAP; no existe mecánica HOLD.
 
 ## Publicación en GitHub Pages
 
-1. Crea un repositorio nuevo en GitHub.
-2. Mantén la rama principal con el nombre `main`.
-3. Sube **el contenido de esta carpeta**, no la carpeta contenedora. `index.html` debe verse en la raíz del repositorio.
-4. En el repositorio abre **Settings → Pages**.
-5. En **Build and deployment**, selecciona **Deploy from a branch**.
-6. Escoge la rama `main`, la carpeta `/ (root)` y pulsa **Save**.
-7. Espera a que GitHub muestre el enlace publicado.
+Sube el contenido de esta carpeta a la raíz de la rama `main`. `index.html` debe quedar directamente en la raíz.
 
-Esta entrega contiene muy pocos archivos, por lo que no aparece el límite de 100 archivos de la carga web de GitHub.
+En GitHub:
 
-## Multimedia y persistencia
+1. Abre **Settings**.
+2. Entra en **Pages**.
+3. Selecciona **Deploy from a branch**.
+4. Escoge `main` y `/ (root)`.
 
-GitHub Pages es de solo lectura: una aplicación publicada no puede escribir nuevas imágenes dentro del repositorio. Por esa razón:
-
-- Cartas, decks y ajustes se guardan en `localStorage`.
-- Imágenes de cartas, fondo de batalla, video y audio se guardan en `IndexedDB`.
-- Cada navegador y dispositivo mantiene su propia copia.
-- La pestaña **Datos** permite exportar e importar un respaldo completo, incluida la multimedia.
-
-## Protección de las mecánicas
-
-Las imágenes de cartas se muestran en un marco independiente con tamaño fijo y `object-fit: cover`. No se dibujan detrás del nombre, estadísticas o botones.
-
-Durante batalla, el fondo se coloca detrás de tres paneles opacos: carta activa, secuencia y control Xbox. La protección de legibilidad viene activada y aplica estos límites:
-
-- Fondo: máximo 35% de visibilidad.
-- Capa oscura: mínimo 55%.
-- Paneles de juego: fondo oscuro de alto contraste.
-
-El usuario puede desactivar esta protección manualmente desde **Multimedia**, pero los paneles continúan separados del fondo.
-
-## Funciones incluidas
-
-- 100 cartas iniciales.
-- Editor de cartas con 1 a 5 secciones.
-- Acciones exclusivamente TAP: cada pulsación correcta avanza de inmediato.
-- Validación del tiempo humano mínimo usando 0,30 s por pulsación.
-- Imagen individual para cada carta.
-- Decks de 12 cartas y presets guardables.
-- Rival automático en dificultad Fácil, Normal o Difícil.
-- Combate por turnos con 20 puntos de vida.
-- Control Xbox visual mediante clic o toque.
-- Fondo de batalla con imagen o video.
-- Transparencia, capa oscura y desenfoque configurables.
-- Música de combate local.
-- Respaldo completo en JSON.
-- Diseño adaptable para escritorio, tableta y móvil.
-
-## Fórmulas conservadas
+## Orden de carga
 
 ```text
-PoderBruto = NúmeroTotalDeAcciones / TiempoLímiteTotal
-
-PoderNeto = (BotonesCorrectos / TiempoReal) × (1 + Coeficiente)
-
-Coeficiente = sqrt(N² / suma(frecuencia²)) / 10
-
-Daño = PoderNeto
+index.html
+  ├── data.js
+  ├── animation/animation-registry.js
+  ├── particles/particle-pool.js
+  ├── camera/camera-controller.js
+  ├── characters/stickman.js
+  ├── effects/effect-system.js
+  ├── game-systems.js
+  ├── emblem-system.js
+  ├── emblems/visual-emblems.js
+  ├── combat/combat-visuals.js
+  └── main.js
 ```
 
-## Navegadores recomendados
-
-Chrome, Edge, Firefox o Safari en versiones modernas. Para conservar archivos multimedia, el navegador debe permitir IndexedDB y almacenamiento local.
-
-## Migración desde QTE Lab 8.0
-
-Al abrir esta versión, cualquier acción HOLD presente en cartas guardadas o respaldos antiguos se convierte automáticamente en una pulsación TAP del mismo botón. Las imágenes, decks y ajustes se conservan.
+Consulta `CAMBIOS_V10_0.md`, `ARQUITECTURA_V10.md` y `PRUEBAS_V10_0.md`.

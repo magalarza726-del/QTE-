@@ -1,35 +1,41 @@
-# Guía rápida de publicación
+# Guía rápida de publicación — QTE Lab v10.0
 
-## Estructura correcta del repositorio
+## Estructura correcta
 
 ```text
 TuRepositorio/
 ├── .nojekyll
 ├── index.html
 ├── main.js
+├── game-systems.js
+├── emblem-system.js
 ├── data.js
 ├── styles.css
-├── README.md
-├── GUIA_GITHUB_PAGES.md
-└── CAMBIOS_V8_1.md
+├── animation/
+├── camera/
+├── characters/
+├── combat/
+├── effects/
+├── emblems/
+├── particles/
+└── README.md
 ```
 
-El archivo importante es `index.html`: debe quedar directamente en la raíz de la rama `main`.
+`index.html` debe quedar directamente en la raíz de la rama `main`. No cambies los nombres de las carpetas porque los scripts usan rutas relativas.
 
 ## Desde la web de GitHub
 
 1. Abre el repositorio.
 2. Pulsa **Add file → Upload files**.
-3. Arrastra todos los archivos de esta carpeta.
-4. Escribe un mensaje como `Publicar QTE Lab 8.1`.
-5. Confirma con **Commit changes** sobre `main`.
-6. Ve a **Settings → Pages**.
-7. Selecciona **Deploy from a branch**.
-8. Configura `main` y `/ (root)`.
-9. Guarda.
+3. Arrastra todos los archivos y carpetas de esta entrega.
+4. Confirma los cambios sobre `main`.
+5. Ve a **Settings → Pages**.
+6. Selecciona **Deploy from a branch**.
+7. Configura `main` y `/ (root)`.
+8. Guarda.
 
-## Actualizaciones futuras
+GitHub Pages publicará `index.html` como entrada principal.
 
-Sustituye `index.html`, `main.js`, `styles.css` o `data.js` en la misma rama `main`. GitHub Pages volverá a publicar automáticamente.
+## Datos de los jugadores
 
-Los cambios guardados por cada jugador no se suben al repositorio: permanecen en su navegador. Para moverlos a otro equipo usa **Datos → Descargar respaldo** y luego **Importar respaldo**.
+El progreso no se escribe en GitHub. Permanece en `localStorage` e `IndexedDB` del navegador de cada jugador. Para moverlo a otro dispositivo usa **Datos → Descargar respaldo** e **Importar respaldo**.
