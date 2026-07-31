@@ -4,20 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#07111f">
-  <meta name="description" content="QTE Lab v10.0.1: juego estratégico de cartas, emblemas y combate QTE con animaciones procedurales para GitHub Pages.">
+  <meta name="description" content="QTE Lab v10.1.0: juego estratégico de cartas, emblemas y combate QTE con animaciones procedurales para GitHub Pages.">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>QTE Lab v10.0.1 · GitHub Pages</title>
-  <link rel="stylesheet" href="./styles.css?v=10.0.1-20260730">
+  <title>QTE Lab v10.1.0 · GitHub Pages</title>
+  <link rel="stylesheet" href="./styles.css?v=10.1.0-20260730">
 </head>
-<body data-build="10.0.1-20260730">
+<body data-build="10.1.0-20260730">
   <noscript><div class="noscript">QTE Lab necesita JavaScript activado.</div></noscript>
   <div id="app" class="app-shell">
     <header class="topbar">
       <button id="brandHome" class="brand" type="button" aria-label="Ir al inicio">
         <span class="brand-mark">Q</span>
-        <span><strong>QTE Lab</strong><small>GitHub Pages · v10.0.1</small></span>
+        <span><strong>QTE Lab</strong><small>GitHub Pages · v10.1.0</small></span>
       </button>
       <nav id="mainNav" class="main-nav" aria-label="Navegación principal">
         <button data-route="home" class="nav-button active">Inicio</button>
@@ -105,6 +105,7 @@
           </article>
         </div>
         <div class="notice success">Los encantamientos se revelan desde el comienzo del combate. Cada posición del mazo recibe exactamente un emblema.</div>
+        <div class="balance-note">Balance v10.1: máximo 38 % de vida por carta, 58 % por turno, 25 % de autodaño y 15 % de curación por turno. Ningún emblema puede eliminar desde vida completa en una sola interacción.</div>
       </section>
 
       <section id="page-decks" class="page" data-page="decks">
@@ -236,10 +237,13 @@
             </div>
             <p class="muted">Prueba una imagen clara, una oscura y un video con mucho movimiento. Los datos deben seguir siendo el primer plano.</p>
           </article>
-          <article class="panel media-controls">
-            <h2>Música de combate</h2>
-            <div class="upload-row"><label class="file-button">Adjuntar audio<input id="musicInput" type="file" accept="audio/*"></label><button id="removeMusicButton" class="ghost danger-text">Eliminar pista</button></div>
-            <p id="musicFileName" class="muted">Sin audio cargado.</p>
+          <article class="panel media-controls music-library-panel">
+            <div class="section-toolbar"><div><h2>Biblioteca de música</h2><p class="muted">Incluye 10 pistas procedurales y admite hasta 20 audios propios.</p></div><span id="musicTrackCount" class="count-pill">10 pistas</span></div>
+            <label class="toggle-row"><input id="musicRandomToggle" type="checkbox" checked><span><strong>Pista diferente en cada combate</strong><small>La selección aleatoria evita repetir la pista anterior cuando hay alternativas.</small></span></label>
+            <div class="upload-row"><label class="file-button">Adjuntar pistas<input id="musicInput" type="file" accept="audio/*" multiple></label><button id="removeMusicButton" class="ghost danger-text">Eliminar seleccionada</button></div>
+            <label><span>Pista para selección manual</span><select id="musicLibrarySelect"></select></label>
+            <div id="musicTrackList" class="music-track-list"></div>
+            <p id="musicFileName" class="muted">10 pistas procedurales disponibles.</p>
           </article>
         </div>
       </section>
@@ -282,8 +286,14 @@
         <div class="animation-editor-layout">
           <section class="panel animation-editor-controls">
             <div><span class="eyebrow">TÉCNICA PROCEDURAL</span><h3>Animación de la carta</h3><p>La carta referencia una animación reutilizable. Ningún sprite forma parte de la lógica.</p></div>
+            <div class="animation-studio-toolbar">
+              <label><span>Modo</span><select id="animationModeSelect"><option value="single">Técnica individual</option><option value="sequence">Secuencia final</option></select></label>
+              <label><span>Nombre de la animación</span><input id="animationName" maxlength="60" placeholder="Ej. Combo del eclipse"></label>
+              <label><span>Biblioteca personalizada</span><select id="customAnimationSelect"><option value="">Sin preset</option></select></label>
+              <div class="animation-studio-actions"><button id="saveCustomAnimationButton" type="button" class="secondary">Guardar en biblioteca</button><button id="loadCustomAnimationButton" type="button" class="ghost">Cargar</button><button id="deleteCustomAnimationButton" type="button" class="ghost danger-text">Eliminar</button></div>
+            </div>
             <div class="animation-control-grid">
-              <label><span>Tipo de animación</span><select id="animationTypeSelect"></select></label>
+              <label><span>Tipo de técnica</span><select id="animationTypeSelect"></select></label>
               <label><span>Velocidad</span><input id="animationSpeed" type="number" min="0.25" max="3" step="0.05"></label>
               <label><span>Distancia recorrida</span><input id="animationDistance" type="number" min="0" max="500" step="5"></label>
               <label><span>Número de impactos</span><input id="animationImpacts" type="number" min="1" max="8" step="1"></label>
@@ -296,7 +306,12 @@
               <label><span>Emblema de prueba</span><select id="animationPreviewEmblem"></select></label>
               <label><span>Precisión de prueba</span><input id="animationPreviewAccuracy" type="range" min="0" max="100" value="96"><output id="animationPreviewAccuracyOutput">96%</output></label>
             </div>
-            <button id="previewAnimationButton" type="button" class="primary">Previsualizar</button>
+            <div id="animationSequencePanel" class="animation-sequence-panel hidden">
+              <div class="section-toolbar"><div><h3>Secuencia de técnicas</h3><p class="muted">Encadena hasta 16 movimientos. Cada paso conserva sus parámetros y su pausa.</p></div><button id="addAnimationStepButton" type="button" class="secondary">＋ Añadir técnica actual</button></div>
+              <div id="animationSequenceList" class="animation-sequence-list"></div>
+              <div class="notice">Ejemplo: Dash → Uppercut → Explosión. La secuencia se reproduce automáticamente como animación final.</div>
+            </div>
+            <div class="animation-preview-actions"><button id="previewAnimationButton" type="button" class="primary">Previsualizar animación final</button><span id="animationTotalDuration" class="count-pill">0.00 s</span></div>
           </section>
           <section class="panel animation-preview-panel">
             <div><span class="eyebrow">PREVISUALIZACIÓN</span><h3 id="animationPreviewTitle">Golpe recto</h3><p>Manos y pies adoptan el color del emblema. El color del ataque responde a la precisión.</p></div>
@@ -318,16 +333,18 @@
 
   <div id="toastRegion" class="toast-region" aria-live="polite"></div>
   <audio id="battleMusic" loop></audio>
-  <script src="./data.js?v=10.0.1-20260730"></script>
-  <script src="./animation/animation-registry.js?v=10.0.1-20260730"></script>
-  <script src="./particles/particle-pool.js?v=10.0.1-20260730"></script>
-  <script src="./camera/camera-controller.js?v=10.0.1-20260730"></script>
-  <script src="./characters/stickman.js?v=10.0.1-20260730"></script>
-  <script src="./effects/effect-system.js?v=10.0.1-20260730"></script>
-  <script src="./game-systems.js?v=10.0.1-20260730"></script>
-  <script src="./emblem-system.js?v=10.0.1-20260730"></script>
-  <script src="./emblems/visual-emblems.js?v=10.0.1-20260730"></script>
-  <script src="./combat/combat-visuals.js?v=10.0.1-20260730"></script>
-  <script src="./main.js?v=10.0.1-20260730"></script>
+  <script src="./data.js?v=10.1.0-20260730"></script>
+  <script src="./animation/animation-registry.js?v=10.1.0-20260730"></script>
+  <script src="./particles/particle-pool.js?v=10.1.0-20260730"></script>
+  <script src="./camera/camera-controller.js?v=10.1.0-20260730"></script>
+  <script src="./characters/stickman.js?v=10.1.0-20260730"></script>
+  <script src="./effects/effect-system.js?v=10.1.0-20260730"></script>
+  <script src="./audio/music-system.js?v=10.1.0-20260730"></script>
+  <script src="./game-systems.js?v=10.1.0-20260730"></script>
+  <script src="./emblem-system.js?v=10.1.0-20260730"></script>
+  <script src="./emblems/visual-emblems.js?v=10.1.0-20260730"></script>
+  <script src="./combat/balance-system.js?v=10.1.0-20260730"></script>
+  <script src="./combat/combat-visuals.js?v=10.1.0-20260730"></script>
+  <script src="./main.js?v=10.1.0-20260730"></script>
 </body>
 </html>

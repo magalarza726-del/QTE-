@@ -1,4 +1,4 @@
-# Guía rápida de publicación — QTE Lab v10.0
+# Guía rápida de publicación — QTE Lab v10.1
 
 ## Estructura correcta
 

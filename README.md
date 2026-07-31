@@ -1,38 +1,78 @@
-# QTE Lab v10.0 — Animaciones procedurales
+# QTE Lab v10.1 — Balance Studio
 
 Juego web estático de construcción de mazos, Emblemas y combate QTE, compatible con GitHub Pages.
 
 ## Novedades principales
 
-- Quince técnicas reutilizables generadas completamente mediante código.
-- Personajes tipo stickman construidos por partes independientes.
-- Manos y pies coloreados según el Emblema activo.
-- Seis niveles visuales vinculados a la precisión del QTE.
-- Partículas, estelas, destellos, retroceso, zoom y sacudida de cámara.
-- Efectos visuales independientes para los ocho clanes.
-- Pestaña **Animación** en el editor de cartas.
-- Previsualización sin iniciar una batalla.
-- Sonidos procedurales mediante Web Audio.
-- Pools reutilizables de partículas y estelas.
-- Arquitectura preparada para sustituir el stickman por sprites mediante un adaptador de personaje.
+- Rebalance completo de los ocho Emblemas.
+- Límite de daño de 38 % de vida por carta y 58 % por turno.
+- Autodaño de Asesino limitado al 25 % de vida por turno.
+- Curación limitada al 15 % de vida por turno.
+- La carta adicional de Sombra se ejecuta al 65 % de potencia.
+- Biblioteca ampliada de 15 a 30 animaciones procedurales.
+- Animaciones de combate con duración 2,15 veces superior a v10.0.
+- Creador de animaciones personalizadas desde la app.
+- Secuenciador de hasta 16 técnicas por carta.
+- Biblioteca de 10 pistas musicales procedurales integradas.
+- Hasta 20 pistas propias almacenadas en IndexedDB.
+- Selección musical aleatoria sin repetir la pista anterior cuando hay alternativas.
+
+## Animaciones nuevas
+
+Además de las 15 técnicas originales, se añadieron:
+
+- Codazo
+- Rodillazo
+- Patada voladora
+- Doble corte
+- Estocada
+- Bumerán energético
+- Rayo láser
+- Onda de choque
+- Golpe al suelo
+- Patada con voltereta
+- Embestida
+- Caída meteórica
+- Torbellino
+- Ráfaga de disparos
+- Corte de energía
+
+## Creador y secuenciador
+
+Cada carta puede usar:
+
+- Una técnica individual personalizada.
+- Una secuencia final de hasta 16 pasos.
+- Parámetros independientes por paso: técnica, velocidad, duración, impactos y pausa.
+- Parámetros generales de distancia, salto, efecto, estela, cámara y sonido.
+- Presets personalizados guardados dentro del navegador.
+
+Ejemplo:
+
+```text
+Dash → Uppercut → Explosión
+```
+
+## Música
+
+La app incluye diez pistas procedurales generadas mediante Web Audio. También admite hasta veinte audios propios. En modo aleatorio, cada combate intenta reproducir una pista distinta de la anterior.
 
 ## Funciones conservadas
 
 - 100 cartas iniciales editables.
 - Decks de 12 cartas.
-- Ocho Emblemas estratégicos y encantamientos aleatorios.
+- Ocho Emblemas y encantamientos aleatorios.
 - Poder Bruto, Poder Neto y coeficiente de diversidad.
 - Estadísticas persistentes por carta.
 - Imagen individual por carta.
-- Fondo de batalla en imagen o video y transparencia regulable.
-- Música personalizada.
-- `localStorage`, `IndexedDB` y respaldos completos.
+- Fondo de batalla en imagen o video.
+- Exportación e importación de respaldos.
 - Escritorio, móvil vertical y móvil horizontal.
 - Entradas TAP; no existe mecánica HOLD.
 
 ## Publicación en GitHub Pages
 
-Sube el contenido de esta carpeta a la raíz de la rama `main`. `index.html` debe quedar directamente en la raíz.
+Sube el contenido interno de esta carpeta a la raíz de la rama `main`. `index.html` debe quedar directamente en la raíz.
 
 En GitHub:
 
@@ -51,11 +91,13 @@ index.html
   ├── camera/camera-controller.js
   ├── characters/stickman.js
   ├── effects/effect-system.js
+  ├── audio/music-system.js
   ├── game-systems.js
   ├── emblem-system.js
   ├── emblems/visual-emblems.js
+  ├── combat/balance-system.js
   ├── combat/combat-visuals.js
   └── main.js
 ```
 
-Consulta `CAMBIOS_V10_0.md`, `ARQUITECTURA_V10.md` y `PRUEBAS_V10_0.md`.
+Consulta `CAMBIOS_V10_1.md`, `ARQUITECTURA_V10_1.md` y `PRUEBAS_V10_1.md`.

@@ -6,21 +6,25 @@
   const EMBLEMS = window.QTEEmblems;
   const ANIMATIONS = window.QTEAnimations;
   const COMBAT_VISUALS = window.QTECombatVisuals;
+  const BALANCE = window.QTEBalance;
+  const MUSIC = window.QTEMusic;
   if (!INITIAL) throw new Error("No se pudo cargar data.js");
   if (!SYSTEMS) throw new Error("No se pudo cargar game-systems.js");
   if (!EMBLEMS) throw new Error("No se pudo cargar emblem-system.js");
   if (!ANIMATIONS) throw new Error("No se pudo cargar animation/animation-registry.js");
   if (!COMBAT_VISUALS) throw new Error("No se pudo cargar combat/combat-visuals.js");
+  if (!BALANCE) throw new Error("No se pudo cargar combat/balance-system.js");
+  if (!MUSIC) throw new Error("No se pudo cargar audio/music-system.js");
 
-  const APP_VERSION = "10.0.1";
-  const BUILD_ID = "10.0.1-20260730";
+  const APP_VERSION = "10.1.0";
+  const BUILD_ID = "10.1.0-20260730";
   // Se conserva la clave v8 para migrar sin perder datos existentes.
   const STORAGE_KEY = "qte-lab-pages-v8";
   const DB_NAME = "qte-lab-media-v8";
   const DB_STORE = "media";
   const BUTTONS = SYSTEMS.ButtonRegistry.buttons;
   const LABELS = SYSTEMS.ButtonRegistry.labels;
-  const MAX_HP = 20;
+  const MAX_HP = BALANCE.rules.maxHp;
   const DECK_SIZE = 12;
   const HAND_SIZE = 3;
   const MIN_TAP_TIME = 0.3;
@@ -36,6 +40,8 @@
     backgroundId:null, backgroundType:"", backgroundName:"",
     backgroundOpacity:25, overlayOpacity:68, backgroundBlur:2, safeMode:true,
     musicId:null, musicName:"", musicEnabled:true,
+    musicTracks:[], musicRandom:true, selectedMusicId:"proc-neon-rush", lastMusicId:null,
+    customAnimations:[],
     layoutMode:"auto",
     playerEmblems:["shadow"], enemyEmblems:["assassin"]
   };
@@ -323,10 +329,24 @@
     return {
       cards:migrateCardsToTap(clone(INITIAL.cards)),decks,
       playerDeck:clone(decks["Inicial Fácil"]||[]),enemyDeck:clone(decks["Inicial Medio"]||[]),
-      settings:clone(DEFAULT_SETTINGS),
+      settings:normalizeAdvancedSettings(clone(DEFAULT_SETTINGS)),
       enchantments:{player:[],enemy:[]}
     };
   }
+  function normalizeAdvancedSettings(settings){
+    const target=settings||{};
+    const tracks=Array.isArray(target.musicTracks)?target.musicTracks.filter(track=>track&&track.id&&track.name).slice(0,20):[];
+    if(target.musicId&&!tracks.some(track=>track.id===target.musicId))tracks.push({id:target.musicId,name:target.musicName||"Pista migrada",source:"upload"});
+    target.musicTracks=tracks;
+    target.musicRandom=target.musicRandom!==false;
+    target.selectedMusicId=String(target.selectedMusicId||target.musicId||MUSIC.BUILTIN_TRACKS[0].id);
+    target.lastMusicId=target.lastMusicId||null;
+    target.customAnimations=Array.isArray(target.customAnimations)?target.customAnimations.slice(0,60).map((preset,index)=>({
+      id:String(preset?.id||`custom-${index+1}`),name:String(preset?.name||`Animación ${index+1}`),animation:ANIMATIONS.normalize(preset?.animation||preset)
+    })):[];
+    return target;
+  }
+
   function loadState(){
     const fallback=defaultState();
     try{
@@ -337,7 +357,7 @@
         state.decks=stored.decks&&typeof stored.decks==="object"?stored.decks:fallback.decks;
         state.playerDeck=Array.isArray(stored.playerDeck)?stored.playerDeck:fallback.playerDeck;
         state.enemyDeck=Array.isArray(stored.enemyDeck)?stored.enemyDeck:fallback.enemyDeck;
-        state.settings={...fallback.settings,...stored.settings};
+        state.settings=normalizeAdvancedSettings({...fallback.settings,...stored.settings});
         state.settings.playerEmblems=normalizeEmblemSelection(state.settings.playerEmblems,["shadow"]);
         state.settings.enemyEmblems=normalizeEmblemSelection(state.settings.enemyEmblems,["assassin"]);
         state.enchantments=stored.enchantments&&typeof stored.enchantments==="object"
@@ -347,6 +367,7 @@
     }catch(error){console.warn(error);Object.assign(state,fallback);}
   }
   function saveState(message="Guardado local"){
+    normalizeAdvancedSettings(state.settings);
     state.cards.forEach(card=>SYSTEMS.CardSchema.refreshComputed(card));
     const payload={version:APP_VERSION,cards:state.cards,decks:state.decks,playerDeck:state.playerDeck,enemyDeck:state.enemyDeck,settings:state.settings,enchantments:state.enchantments};
     localStorage.setItem(STORAGE_KEY,JSON.stringify(payload));
@@ -403,7 +424,7 @@
         <div class="card-art" data-media-id="${escapeHtml(card.imageId||"")}"><span>${card.imageId?"Cargando…":"Sin imagen"}</span></div>
         <div class="card-body"><div class="stars">${"★".repeat(stars)}${"☆".repeat(7-stars)}</div><h3>${escapeHtml(card.nombre)}</h3>
           ${card.emblemId?emblemBadgeHtml(card.emblemId):""}
-          <div class="card-meta expanded"><span>PB<strong>${rawPower(card).toFixed(3)}</strong></span><span>CV<strong>${variationCoefficient(card).toFixed(3)}</strong></span><span>Botones<strong>${cardTotalButtons(card)}</strong></span><span>Tiempo<strong>${cardTotalTime(card).toFixed(2)} s</strong></span><span>Secciones<strong>${card.secciones.length}</strong></span><span>Animación<strong>${escapeHtml(ANIMATIONS.labels[card.animation?.type]||"Golpe recto")}</strong></span></div>
+          <div class="card-meta expanded"><span>PB<strong>${rawPower(card).toFixed(3)}</strong></span><span>CV<strong>${variationCoefficient(card).toFixed(3)}</strong></span><span>Botones<strong>${cardTotalButtons(card)}</strong></span><span>Tiempo<strong>${cardTotalTime(card).toFixed(2)} s</strong></span><span>Secciones<strong>${card.secciones.length}</strong></span><span>Animación<strong>${escapeHtml(ANIMATIONS.labelFor(card.animation))}</strong></span></div>
           ${context==="battle"?`<span class="secondary" style="width:100%">${button}</span>`:""}
         </div>
       </button>
@@ -486,45 +507,90 @@
     ];
     $("#editorStatisticsList").innerHTML=rows.map(([label,value])=>`<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("");
   }
+  function animationDraftFromUI(){
+    return ANIMATIONS.normalizeSingle({
+      type:$("#animationTypeSelect").value,
+      speed:Number($("#animationSpeed").value),distance:Number($("#animationDistance").value),
+      impacts:Number($("#animationImpacts").value),duration:Number($("#animationDuration").value),
+      jumpHeight:Number($("#animationJumpHeight").value),effectSize:Number($("#animationEffectSize").value),
+      trailLength:Number($("#animationTrailLength").value),cameraShake:Number($("#animationCameraShake").value),
+      sound:$("#animationSound").value
+    });
+  }
+  function renderCustomAnimationOptions(){
+    const select=$("#customAnimationSelect"),current=select.value;
+    select.innerHTML='<option value="">Sin preset</option>'+state.settings.customAnimations.map(item=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("");
+    select.value=state.settings.customAnimations.some(item=>item.id===current)?current:"";
+  }
+  function renderAnimationSequence(){
+    const config=ANIMATIONS.normalize(editor.card.animation,editor.index??0),panel=$("#animationSequencePanel"),list=$("#animationSequenceList");
+    panel.classList.toggle("hidden",config.mode!=="sequence");
+    if(config.mode!=="sequence"){list.innerHTML="";return;}
+    list.innerHTML=config.sequence.map((step,index)=>`<article class="animation-sequence-step" data-animation-step="${index}">
+      <span class="sequence-step-number">${index+1}</span>
+      <label><span>Técnica</span><select data-step-field="type">${ANIMATIONS.TYPES.map(([id,label])=>`<option value="${id}" ${id===step.animation.type?"selected":""}>${escapeHtml(label)}</option>`).join("")}</select></label>
+      <label><span>Velocidad</span><input data-step-field="speed" type="number" min=".25" max="3" step=".05" value="${step.animation.speed}"></label>
+      <label><span>Duración</span><input data-step-field="duration" type="number" min=".2" max="6" step=".05" value="${step.animation.duration}"></label>
+      <label><span>Impactos</span><input data-step-field="impacts" type="number" min="1" max="12" step="1" value="${step.animation.impacts}"></label>
+      <label><span>Pausa</span><input data-step-field="pauseAfter" type="number" min="0" max="2" step=".05" value="${step.pauseAfter}"></label>
+      <div class="sequence-step-actions"><button type="button" class="ghost" data-sequence-action="up" title="Subir">↑</button><button type="button" class="ghost" data-sequence-action="down" title="Bajar">↓</button><button type="button" class="ghost danger-text" data-sequence-action="delete">Eliminar</button></div>
+    </article>`).join("");
+  }
+  function updateAnimationDurationLabel(){
+    const scale=COMBAT_VISUALS.COMBAT_DURATION_SCALE||2;
+    $("#animationTotalDuration").textContent=`Combate: ${ANIMATIONS.totalDuration(editor.card.animation,{scale}).toFixed(2)} s`;
+    $("#animationPreviewTitle").textContent=ANIMATIONS.labelFor(editor.card.animation);
+  }
   function renderEditorAnimation(){
     editor.card.animation=ANIMATIONS.normalize(editor.card.animation,editor.index??0);
-    const config=editor.card.animation;
-    const typeSelect=$("#animationTypeSelect");
-    typeSelect.innerHTML=ANIMATIONS.TYPES.map(([id,label])=>`<option value="${id}">${escapeHtml(label)}</option>`).join("");
-    typeSelect.value=config.type;
-    const emblemSelect=$("#animationPreviewEmblem");
-    emblemSelect.innerHTML=EMBLEMS.all().map(emblem=>`<option value="${emblem.id}">${escapeHtml(emblem.name)}</option>`).join("");
-    if(!emblemSelect.value)emblemSelect.value="shadow";
+    const config=editor.card.animation,draft=config.mode==="sequence"?config.sequence[0].animation:config;
+    const typeSelect=$("#animationTypeSelect");typeSelect.innerHTML=ANIMATIONS.TYPES.map(([id,label])=>`<option value="${id}">${escapeHtml(label)}</option>`).join("");typeSelect.value=draft.type;
+    $("#animationModeSelect").value=config.mode;$("#animationName").value=config.name||"";
+    const emblemSelect=$("#animationPreviewEmblem");emblemSelect.innerHTML=EMBLEMS.all().map(emblem=>`<option value="${emblem.id}">${escapeHtml(emblem.name)}</option>`).join("");if(!emblemSelect.value)emblemSelect.value="shadow";
     const fields={animationSpeed:"speed",animationDistance:"distance",animationImpacts:"impacts",animationDuration:"duration",animationJumpHeight:"jumpHeight",animationEffectSize:"effectSize",animationTrailLength:"trailLength",animationCameraShake:"cameraShake",animationSound:"sound"};
-    Object.entries(fields).forEach(([id,key])=>{$(`#${id}`).value=config[key];});
-    $("#animationPreviewTitle").textContent=ANIMATIONS.labels[config.type]||config.type;
+    Object.entries(fields).forEach(([id,key])=>{$(`#${id}`).value=draft[key];});
     $("#animationPreviewAccuracyOutput").textContent=`${$("#animationPreviewAccuracy").value}%`;
-    previewRenderer=COMBAT_VISUALS.getRenderer($("#animationPreviewCanvas"),{preview:true});
-    previewRenderer.activeRuntime.player={emblemId:emblemSelect.value,emblem:EMBLEMS.get(emblemSelect.value)};
-    previewRenderer.activeRuntime.enemy={emblemId:"squire",emblem:EMBLEMS.get("squire")};
-    requestAnimationFrame(()=>previewRenderer.idleFrame());
+    renderCustomAnimationOptions();renderAnimationSequence();updateAnimationDurationLabel();
+    previewRenderer=COMBAT_VISUALS.getRenderer($("#animationPreviewCanvas"),{preview:true});previewRenderer.activeRuntime.player={emblemId:emblemSelect.value,emblem:EMBLEMS.get(emblemSelect.value)};previewRenderer.activeRuntime.enemy={emblemId:"squire",emblem:EMBLEMS.get("squire")};requestAnimationFrame(()=>previewRenderer.idleFrame());
   }
   function syncEditorAnimationFromUI(){
     if(!editor.card)return;
-    editor.card.animation=ANIMATIONS.normalize({
-      type:$("#animationTypeSelect").value,
-      speed:Number($("#animationSpeed").value),
-      distance:Number($("#animationDistance").value),
-      impacts:Number($("#animationImpacts").value),
-      duration:Number($("#animationDuration").value),
-      jumpHeight:Number($("#animationJumpHeight").value),
-      effectSize:Number($("#animationEffectSize").value),
-      trailLength:Number($("#animationTrailLength").value),
-      cameraShake:Number($("#animationCameraShake").value),
-      sound:$("#animationSound").value
-    });
-    $("#animationPreviewTitle").textContent=ANIMATIONS.labels[editor.card.animation.type]||editor.card.animation.type;
+    const mode=$("#animationModeSelect").value,name=$("#animationName").value.trim(),draft=animationDraftFromUI(),current=ANIMATIONS.normalize(editor.card.animation,editor.index??0);
+    if(mode==="sequence"){
+      const sequence=current.mode==="sequence"?current.sequence:[{id:randomId("step"),animation:ANIMATIONS.normalizeSingle(current),pauseAfter:.08}];
+      editor.card.animation=ANIMATIONS.normalize({mode:"sequence",name:name||current.name||"Secuencia personalizada",sequence});
+    }else editor.card.animation=ANIMATIONS.normalize({...draft,mode:"single",name});
+    renderAnimationSequence();updateAnimationDurationLabel();
+  }
+  function addAnimationStep(){
+    syncEditorAnimationFromUI();let config=ANIMATIONS.normalize(editor.card.animation);if(config.mode!=="sequence")config=ANIMATIONS.normalize({mode:"sequence",name:$("#animationName").value.trim()||"Secuencia personalizada",sequence:[]});
+    if(config.sequence.length>=16){toast("La secuencia admite hasta 16 técnicas.","error");return;}
+    config.sequence.push({id:randomId("step"),animation:animationDraftFromUI(),pauseAfter:.08});editor.card.animation=ANIMATIONS.normalize(config);renderAnimationSequence();updateAnimationDurationLabel();
+  }
+  function editAnimationStep(index,field,value){
+    const config=ANIMATIONS.normalize(editor.card.animation);if(config.mode!=="sequence"||!config.sequence[index])return;
+    if(field==="pauseAfter")config.sequence[index].pauseAfter=clamp(Number(value),0,2);else config.sequence[index].animation=ANIMATIONS.normalizeSingle({...config.sequence[index].animation,[field]:field==="type"?value:Number(value)});
+    editor.card.animation=ANIMATIONS.normalize(config);updateAnimationDurationLabel();
+  }
+  function sequenceAction(index,action){
+    const config=ANIMATIONS.normalize(editor.card.animation);if(config.mode!=="sequence")return;
+    if(action==="delete"&&config.sequence.length>1)config.sequence.splice(index,1);
+    if(action==="up"&&index>0)[config.sequence[index-1],config.sequence[index]]=[config.sequence[index],config.sequence[index-1]];
+    if(action==="down"&&index<config.sequence.length-1)[config.sequence[index+1],config.sequence[index]]=[config.sequence[index],config.sequence[index+1]];
+    editor.card.animation=ANIMATIONS.normalize(config);renderAnimationSequence();updateAnimationDurationLabel();
+  }
+  function saveCustomAnimation(){
+    syncEditorAnimationFromUI();const name=$("#animationName").value.trim()||ANIMATIONS.labelFor(editor.card.animation);const preset={id:randomId("custom-animation"),name,animation:clone(editor.card.animation)};
+    state.settings.customAnimations.push(preset);state.settings.customAnimations=state.settings.customAnimations.slice(-60);saveState("Animación guardada");renderCustomAnimationOptions();$("#customAnimationSelect").value=preset.id;toast(`Animación “${name}” guardada.`);
+  }
+  function loadCustomAnimation(){
+    const preset=state.settings.customAnimations.find(item=>item.id===$("#customAnimationSelect").value);if(!preset){toast("Selecciona una animación personalizada.","error");return;}editor.card.animation=clone(preset.animation);renderEditorAnimation();toast(`Animación “${preset.name}” cargada.`);
+  }
+  function deleteCustomAnimation(){
+    const id=$("#customAnimationSelect").value,preset=state.settings.customAnimations.find(item=>item.id===id);if(!preset)return;if(!confirmAction(`¿Eliminar la animación “${preset.name}”?`))return;state.settings.customAnimations=state.settings.customAnimations.filter(item=>item.id!==id);saveState("Animación eliminada");renderCustomAnimationOptions();
   }
   async function previewEditorAnimation(){
-    syncEditorAnimationFromUI();
-    const accuracy=Number($("#animationPreviewAccuracy").value);
-    $("#animationPreviewAccuracyOutput").textContent=`${accuracy}%`;
-    await COMBAT_VISUALS.preview($("#animationPreviewCanvas"),editor.card.animation,$("#animationPreviewEmblem").value,accuracy);
+    syncEditorAnimationFromUI();const accuracy=Number($("#animationPreviewAccuracy").value);$("#animationPreviewAccuracyOutput").textContent=`${accuracy}%`;await COMBAT_VISUALS.preview($("#animationPreviewCanvas"),editor.card.animation,$("#animationPreviewEmblem").value,accuracy);
   }
 
   function setEditorTab(tab){
@@ -634,12 +700,23 @@
     const count=deck.filter(name=>cardByName(name)).length;
     $(side==="player"?"#playerDeckCount":"#enemyDeckCount").textContent=`${count} / ${DECK_SIZE}`;
   }
+  function allMusicTracks(){
+    return [
+      ...MUSIC.BUILTIN_TRACKS.map(track=>({...track,source:"procedural"})),
+      ...state.settings.musicTracks.map(track=>({...track,source:"upload"}))
+    ];
+  }
   function renderMusicOptions(){
-    const select=$("#musicSelect");const current=(state.settings.musicEnabled&&state.settings.musicId)?state.settings.musicId:"";
-    select.innerHTML=`<option value="">Sin música</option>${state.settings.musicId?`<option value="${escapeHtml(state.settings.musicId)}">${escapeHtml(state.settings.musicName||"Pista personalizada")}</option>`:""}`;
-    select.value=current;
+    normalizeAdvancedSettings(state.settings);const tracks=allMusicTracks(),select=$("#musicSelect"),library=$("#musicLibrarySelect");
+    const options=tracks.map(track=>`<option value="${escapeHtml(track.id)}">${track.source==="procedural"?"⚙":"♪"} ${escapeHtml(track.name)}</option>`).join("");
+    select.innerHTML=`<option value="">Sin música</option><option value="__random__">Aleatoria · diferente por combate</option>${options}`;
+    select.value=!state.settings.musicEnabled?"":state.settings.musicRandom?"__random__":(tracks.some(track=>track.id===state.settings.selectedMusicId)?state.settings.selectedMusicId:tracks[0]?.id||"");
+    if(library){library.innerHTML=options;library.value=tracks.some(track=>track.id===state.settings.selectedMusicId)?state.settings.selectedMusicId:tracks[0]?.id||"";}
     $("#musicVolume").value=state.settings.musicVolume;$("#musicVolumeOutput").textContent=`${state.settings.musicVolume}%`;
-    $("#musicFileName").textContent=state.settings.musicId?state.settings.musicName:"Sin audio cargado.";
+    const randomToggle=$("#musicRandomToggle");if(randomToggle)randomToggle.checked=!!state.settings.musicRandom;
+    const count=$("#musicTrackCount");if(count)count.textContent=`${tracks.length} pistas`;
+    const list=$("#musicTrackList");if(list)list.innerHTML=tracks.map(track=>`<div class="music-track-item ${track.id===state.settings.lastMusicId?"last-played":""}" data-music-id="${escapeHtml(track.id)}"><span>${track.source==="procedural"?"⚙":"♪"}</span><div><strong>${escapeHtml(track.name)}</strong><small>${track.source==="procedural"?"Procedural integrada":"Audio local"}${track.id===state.settings.lastMusicId?" · última reproducida":""}</small></div>${track.source==="upload"?'<button type="button" class="ghost danger-text" data-remove-music="'+escapeHtml(track.id)+'">Eliminar</button>':""}</div>`).join("");
+    const current=tracks.find(track=>track.id===state.settings.selectedMusicId);const fileName=$("#musicFileName");if(fileName)fileName.textContent=state.settings.musicRandom?`${tracks.length} pistas disponibles · selección aleatoria activa`:(current?`Selección manual: ${current.name}`:"Sin música");
   }
   function renderDecks(){
     state.playerDeck=sanitizeDeck(state.playerDeck);state.enemyDeck=sanitizeDeck(state.enemyDeck);
@@ -700,11 +777,14 @@
     if(old)await mediaDB.delete(old);
     saveState("Fondo guardado");await applyMediaSettings();toast("Fondo de batalla actualizado.");
   }
-  async function attachMusic(file){
-    if(!file)return;if(!file.type.startsWith("audio/")){toast("Selecciona un archivo de audio.","error");return;}
-    const old=state.settings.musicId;const id=await mediaDB.put(file,{name:file.name});
-    state.settings.musicId=id;state.settings.musicName=file.name;state.settings.musicEnabled=true;if(old)await mediaDB.delete(old);
-    saveState("Música guardada");renderMusicOptions();toast("Música de combate actualizada.");
+  async function attachMusic(files){
+    const incoming=[...(files||[])].filter(file=>file?.type?.startsWith("audio/"));if(!incoming.length){toast("Selecciona uno o varios archivos de audio.","error");return;}
+    const available=Math.max(0,20-state.settings.musicTracks.length);if(!available){toast("La biblioteca local admite hasta 20 pistas propias.","error");return;}
+    for(const file of incoming.slice(0,available)){const id=await mediaDB.put(file,{name:file.name});state.settings.musicTracks.push({id,name:file.name,source:"upload"});state.settings.selectedMusicId=id;}
+    state.settings.musicEnabled=true;saveState("Biblioteca musical guardada");renderMusicOptions();toast(`${Math.min(incoming.length,available)} pista(s) añadida(s).`);
+  }
+  async function removeMusicTrack(id){
+    const track=state.settings.musicTracks.find(item=>item.id===id);if(!track)return;await mediaDB.delete(id);state.settings.musicTracks=state.settings.musicTracks.filter(item=>item.id!==id);if(state.settings.selectedMusicId===id)state.settings.selectedMusicId=MUSIC.BUILTIN_TRACKS[0].id;if(state.settings.lastMusicId===id)state.settings.lastMusicId=null;saveState("Pista eliminada");renderMusicOptions();
   }
 
   function makeBattleDeck(names, assignments=[]){
@@ -730,12 +810,14 @@
     for(const id of ["battleIdle","battleSelection","battleQte","battleAnimation","battleResult"])$(`#${id}`).classList.toggle("hidden",id!==view);
   }
   async function playBattleMusic(){
-    const audio=$("#battleMusic");audio.pause();audio.removeAttribute("src");
-    if(!state.settings.musicId||!state.settings.musicEnabled)return;
-    const url=await mediaDB.url(state.settings.musicId);if(!url)return;
-    audio.src=url;audio.volume=Number(state.settings.musicVolume)/100;audio.play().catch(()=>toast("El navegador requiere una interacción para iniciar el audio."));
+    stopBattleMusic();if(!state.settings.musicEnabled)return null;const tracks=allMusicTracks();if(!tracks.length)return null;
+    const chosen=state.settings.musicRandom?MUSIC.chooseRandom(tracks,state.settings.lastMusicId):(tracks.find(track=>track.id===state.settings.selectedMusicId)||tracks[0]);if(!chosen)return null;
+    state.settings.lastMusicId=chosen.id;state.settings.selectedMusicId=chosen.id;localStorage.setItem(STORAGE_KEY,JSON.stringify({version:APP_VERSION,cards:state.cards,decks:state.decks,playerDeck:state.playerDeck,enemyDeck:state.enemyDeck,settings:state.settings,enchantments:state.enchantments}));
+    const volume=Number(state.settings.musicVolume)/100;
+    if(chosen.source==="procedural"){MUSIC.engine.play(chosen.id,volume);}else{const audio=$("#battleMusic"),url=await mediaDB.url(chosen.id);if(url){audio.src=url;audio.volume=volume;audio.play().catch(()=>toast("El navegador requiere una interacción para iniciar el audio."));}}
+    renderMusicOptions();return chosen;
   }
-  function stopBattleMusic(){const audio=$("#battleMusic");audio.pause();audio.currentTime=0;}
+  function stopBattleMusic(){const audio=$("#battleMusic");audio.pause();audio.currentTime=0;audio.removeAttribute("src");MUSIC.engine.stop();}
   function executionRuntime(card,side){
     const battle=state.battle;
     return EMBLEMS.prepareCard(card,card.emblemId,{
@@ -798,6 +880,7 @@
   async function beginPlayerQte(card,isExtra=false){
     const battle=state.battle;
     const runtime=executionRuntime(card,"player");
+    if(isExtra){runtime.shadowExtra=true;runtime.outgoingMultiplier*=Number(runtime.extraCardMultiplier||.65);}
     battle.currentCard=card;battle.currentRuntime=runtime;battle.engine=new QTEEngine(runtime.card);battle.engine.start();
     battle.phase=isExtra?"qte-extra":"qte";
     $("#battlePhaseLabel").textContent=isExtra?"QTE ADICIONAL · SOMBRA":"QTE DEL JUGADOR";
@@ -868,14 +951,14 @@
     $("#animationEmblemName").style.color=emblem?.color||"";
     $("#animationAccuracy").textContent=`${Number(execution.result?.accuracy||0).toFixed(1)}%`;
     $("#animationNetPower").textContent=Number(execution.result?.netPower||0).toFixed(4);
-    $("#animationTechniqueLabel").textContent=`${side==="player"?"JUGADOR":"RIVAL"} · ${ANIMATIONS.labels[execution.runtime?.card?.animation?.type||execution.card?.animation?.type]||"TÉCNICA"}`;
+    $("#animationTechniqueLabel").textContent=`${side==="player"?"JUGADOR":"RIVAL"} · ${ANIMATIONS.labelFor(execution.runtime?.card?.animation||execution.card?.animation)}`;
   }
   async function playExecutionVisual(execution,side){
     const battle=state.battle;if(!battle||!execution)return;
     battle.phase="animation";$("#battlePhaseLabel").textContent=side==="player"?"TÉCNICA DEL JUGADOR":"CONTRAATAQUE RIVAL";
     updateAnimationHud(execution,side);setBattleView("battleAnimation");
     combatRenderer=combatRenderer||COMBAT_VISUALS.getRenderer($("#combatAnimationCanvas"));
-    await combatRenderer.playExecution(execution,side);
+    await combatRenderer.playExecution(execution,side,{onStep:(step,index,total)=>{$("#animationTechniqueLabel").textContent=`${side==="player"?"JUGADOR":"RIVAL"} · ${index+1}/${total} · ${ANIMATIONS.labels[step.animation.type]||step.animation.type}`;}});
     if(side==="player")battle.visualizedPlayerCount=(battle.visualizedPlayerCount||0)+1;
   }
   async function completePlayerExecution(){
@@ -912,21 +995,21 @@
     const coefficient=variationCoefficient(runtime.card);const power=netPower(correct,Math.max(totalTime,.001),coefficient);
     return {correct,incorrect,missed,total:cardTotalButtons(runtime.card),realTime:totalTime,timeLimit:cardTotalTime(runtime.card),accuracy:accuracy(correct,cardTotalButtons(runtime.card)),coefficient,netPower:power,damage:Math.max(0,power),reason:missed?"tiempo_agotado":"completado"};
   }
-  function makeAIExecution(card){
+  function makeAIExecution(card,isExtra=false){
     const runtime=executionRuntime(card,"enemy");
+    if(isExtra){runtime.shadowExtra=true;runtime.outgoingMultiplier*=Number(runtime.extraCardMultiplier||.65);}
     return {card,runtime,result:simulateAI(card,runtime,state.settings.difficulty)};
   }
-  function executionBaseDamage(execution){return Math.max(0,execution.result.netPower*Number(execution.runtime.outgoingMultiplier||1));}
+  function executionBaseDamage(execution){return BALANCE.executionBaseDamage(execution);}
   function perfectHypotheticalDamage(execution){
-    const card=execution.runtime.card;const time=Math.max(execution.result.realTime,cardMinimumTime(card),.001);
-    return netPower(cardTotalButtons(card),time,variationCoefficient(card))*Number(execution.runtime.outgoingMultiplier||1);
+    const card=execution.runtime.card,time=Math.max(execution.result.realTime,cardMinimumTime(card),.001);
+    const raw=netPower(cardTotalButtons(card),time,variationCoefficient(card))*Number(execution.runtime.outgoingMultiplier||1);
+    return Math.min(BALANCE.maxDamagePerCard(),Math.max(0,raw));
   }
-  function sideIncomingMultiplier(executions){return executions.reduce((value,execution)=>Math.min(value,Number(execution.runtime.incomingMultiplier||1)),1);}
-  function allocateEffectiveDamage(executions,incomingMultiplier,targetHp){
-    const projected=executions.map(execution=>executionBaseDamage(execution)*incomingMultiplier);
-    const total=projected.reduce((sum,value)=>sum+value,0);const effectiveTotal=Math.min(Math.max(0,targetHp),total);
-    return {projected,total,effectiveTotal,perExecution:projected.map(value=>total>0?effectiveTotal*(value/total):0)};
-  }
+  function sideSelfDamage(executions){return BALANCE.sideSelfDamage(executions,perfectHypotheticalDamage);}
+  function sideIncomingMultiplier(executions){return BALANCE.incomingMultiplier(executions);}
+  function allocateEffectiveDamage(executions,incomingMultiplier,targetHp){return BALANCE.allocateDamage(executions,incomingMultiplier,targetHp);}
+  function sideHealing(executions,damageAllocation){return BALANCE.healing(executions,damageAllocation);}
   function discardCard(deck,card){const index=deck.hand.indexOf(card);if(index>=0)deck.discard.push(...deck.hand.splice(index,1));}
   function recordExecutionStats(execution,effectiveDamage,side){
     const source=findCardById(execution.card.id);if(!source)return;
@@ -950,14 +1033,14 @@
       const enemyShadowOptions=battle.enemyDeck.hand.filter(card=>card!==battle.enemyChosenCard);
       if(enemyPrimary.runtime.extraCardOnPerfect&&isPerfect(enemyPrimary.result)&&enemyShadowOptions.length){
         battle.extraEnemyCard=enemyShadowOptions[Math.floor(Math.random()*enemyShadowOptions.length)];
-        const extra=makeAIExecution(battle.extraEnemyCard);battle.enemyExecutions.push(extra);if(!battle.enemyUsedIds.includes(extra.card.id))battle.enemyUsedIds.push(extra.card.id);
+        const extra=makeAIExecution(battle.extraEnemyCard,true);battle.enemyExecutions.push(extra);if(!battle.enemyUsedIds.includes(extra.card.id))battle.enemyUsedIds.push(extra.card.id);
       }
       const playerIncoming=sideIncomingMultiplier(battle.playerExecutions),enemyIncoming=sideIncomingMultiplier(battle.enemyExecutions);
       const playerDamage=allocateEffectiveDamage(battle.playerExecutions,enemyIncoming,battle.enemyHp),enemyDamage=allocateEffectiveDamage(battle.enemyExecutions,playerIncoming,battle.playerHp);
-      const playerSelf=battle.playerExecutions.reduce((sum,execution)=>sum+(execution.runtime.selfDamagePerError?execution.result.incorrect*perfectHypotheticalDamage(execution):0),0);
-      const enemySelf=battle.enemyExecutions.reduce((sum,execution)=>sum+(execution.runtime.selfDamagePerError?execution.result.incorrect*perfectHypotheticalDamage(execution):0),0);
-      const playerHeal=battle.playerExecutions.reduce((sum,execution,index)=>sum+playerDamage.perExecution[index]*Number(execution.runtime.healingRate||0),0);
-      const enemyHeal=battle.enemyExecutions.reduce((sum,execution,index)=>sum+enemyDamage.perExecution[index]*Number(execution.runtime.healingRate||0),0);
+      const playerSelf=sideSelfDamage(battle.playerExecutions);
+      const enemySelf=sideSelfDamage(battle.enemyExecutions);
+      const playerHeal=sideHealing(battle.playerExecutions,playerDamage);
+      const enemyHeal=sideHealing(battle.enemyExecutions,enemyDamage);
 
       for(const execution of battle.playerExecutions.slice(battle.visualizedPlayerCount||0))await playExecutionVisual(execution,"player");
       for(const execution of battle.enemyExecutions)await playExecutionVisual(execution,"enemy");
@@ -1006,7 +1089,7 @@
       if(!confirmAction("Se reemplazarán los datos actuales. ¿Continuar?"))return;
       await mediaDB.clear();
       for(const item of payload.media||[])await mediaDB.put(dataUrlToBlob(item.dataUrl),{id:item.id,name:item.name,type:item.type});
-      state.cards=migrateCardsToTap(payload.state.cards);state.decks=payload.state.decks||{};state.playerDeck=payload.state.playerDeck||[];state.enemyDeck=payload.state.enemyDeck||[];state.settings={...defaultState().settings,...payload.state.settings};
+      state.cards=migrateCardsToTap(payload.state.cards);state.decks=payload.state.decks||{};state.playerDeck=payload.state.playerDeck||[];state.enemyDeck=payload.state.enemyDeck||[];state.settings=normalizeAdvancedSettings({...defaultState().settings,...payload.state.settings});
       state.settings.playerEmblems=normalizeEmblemSelection(state.settings.playerEmblems,["shadow"]);state.settings.enemyEmblems=normalizeEmblemSelection(state.settings.enemyEmblems,["assassin"]);
       state.enchantments=payload.state.enchantments||{player:[],enemy:[]};ensureEnchantments();
       saveState("Respaldo importado");location.reload();
@@ -1057,8 +1140,14 @@
     $(".editor-tabs").addEventListener("click",event=>{const button=event.target.closest("[data-editor-tab]");if(button){renderEditorStatistics();if(button.dataset.editorTab==="animation")renderEditorAnimation();setEditorTab(button.dataset.editorTab);}});
     $("#cardEditorDialog").addEventListener("close",async()=>{if(!editor.saved&&editor.pendingImageId)await mediaDB.delete(editor.pendingImageId);});
     $("#editorCardName").addEventListener("input",updateEditorSummary);
-    $("#editorAnimationTab").addEventListener("input",event=>{if(event.target.id==="animationPreviewAccuracy")$("#animationPreviewAccuracyOutput").textContent=`${event.target.value}%`;else syncEditorAnimationFromUI();});
-    $("#editorAnimationTab").addEventListener("change",event=>{if(event.target.id!=="animationPreviewEmblem"&&event.target.id!=="animationPreviewAccuracy")syncEditorAnimationFromUI();});
+    $("#editorAnimationTab").addEventListener("input",event=>{if(event.target.id==="animationPreviewAccuracy")$("#animationPreviewAccuracyOutput").textContent=`${event.target.value}%`;else if(!event.target.dataset.stepField)syncEditorAnimationFromUI();});
+    $("#editorAnimationTab").addEventListener("change",event=>{if(event.target.id!=="animationPreviewEmblem"&&event.target.id!=="animationPreviewAccuracy"&&!event.target.dataset.stepField)syncEditorAnimationFromUI();});
+    $("#animationModeSelect").addEventListener("change",()=>{syncEditorAnimationFromUI();renderEditorAnimation();});
+    $("#animationSequenceList").addEventListener("input",event=>{const row=event.target.closest("[data-animation-step]");if(row&&event.target.dataset.stepField)editAnimationStep(Number(row.dataset.animationStep),event.target.dataset.stepField,event.target.value);});
+    $("#animationSequenceList").addEventListener("change",event=>{const row=event.target.closest("[data-animation-step]");if(row&&event.target.dataset.stepField)editAnimationStep(Number(row.dataset.animationStep),event.target.dataset.stepField,event.target.value);});
+    $("#animationSequenceList").addEventListener("click",event=>{const button=event.target.closest("[data-sequence-action]"),row=event.target.closest("[data-animation-step]");if(button&&row)sequenceAction(Number(row.dataset.animationStep),button.dataset.sequenceAction);});
+    $("#addAnimationStepButton").addEventListener("click",addAnimationStep);
+    $("#saveCustomAnimationButton").addEventListener("click",saveCustomAnimation);$("#loadCustomAnimationButton").addEventListener("click",loadCustomAnimation);$("#deleteCustomAnimationButton").addEventListener("click",deleteCustomAnimation);
     $("#previewAnimationButton").addEventListener("click",previewEditorAnimation);
     $("#addSectionButton").addEventListener("click",()=>{if(editor.card.secciones.length>=5)return;editor.card.secciones.push({nombre:`Sección ${editor.card.secciones.length+1}`,tiempo:1.2,botones:["A"]});editor.activeSection=editor.card.secciones.length-1;renderEditorSections();updateEditorSummary();});
     $("#editorSections").addEventListener("input",event=>{
@@ -1091,8 +1180,8 @@
       if(side==="player")state.playerDeck[index]=select.value;else state.enemyDeck[index]=select.value;saveState();renderDeckSlots(side);
     });
     $("#difficultySelect").addEventListener("change",event=>{state.settings.difficulty=event.target.value;saveState();});
-    $("#musicSelect").addEventListener("change",event=>{state.settings.musicEnabled=!!event.target.value;saveState();});
-    $("#musicVolume").addEventListener("input",event=>{state.settings.musicVolume=Number(event.target.value);$("#musicVolumeOutput").textContent=`${state.settings.musicVolume}%`;$("#battleMusic").volume=state.settings.musicVolume/100;saveState();});
+    $("#musicSelect").addEventListener("change",event=>{const value=event.target.value;state.settings.musicEnabled=!!value;state.settings.musicRandom=value==="__random__";if(value&&value!=="__random__")state.settings.selectedMusicId=value;saveState();renderMusicOptions();});
+    $("#musicVolume").addEventListener("input",event=>{state.settings.musicVolume=Number(event.target.value);$("#musicVolumeOutput").textContent=`${state.settings.musicVolume}%`;$("#battleMusic").volume=state.settings.musicVolume/100;MUSIC.engine.setVolume(state.settings.musicVolume/100);saveState();});
     $("#launchBattleButton").addEventListener("click",startBattle);$("#battleGoDecks").addEventListener("click",()=>go("decks"));$("#continueBattleButton").addEventListener("click",continueBattle);
     $("#battleHand").addEventListener("click",event=>{const button=event.target.closest('[data-action="select-battle-card"]');if(button)selectBattleCard(Number(button.dataset.index));});
     $$('[data-qte]').forEach(button=>{
@@ -1109,12 +1198,15 @@
     $("#backgroundImageInput").addEventListener("change",event=>{const file=event.target.files[0];event.target.value="";attachBackground(file);});
     $("#backgroundVideoInput").addEventListener("change",event=>{const file=event.target.files[0];event.target.value="";attachBackground(file);});
     $("#removeBackgroundButton").addEventListener("click",async()=>{if(state.settings.backgroundId)await mediaDB.delete(state.settings.backgroundId);state.settings.backgroundId=null;state.settings.backgroundType="";state.settings.backgroundName="";saveState();applyMediaSettings();});
-    $("#musicInput").addEventListener("change",event=>{const file=event.target.files[0];event.target.value="";attachMusic(file);});
-    $("#removeMusicButton").addEventListener("click",async()=>{if(state.settings.musicId)await mediaDB.delete(state.settings.musicId);state.settings.musicId=null;state.settings.musicName="";state.settings.musicEnabled=false;saveState();renderMusicOptions();stopBattleMusic();});
+    $("#musicInput").addEventListener("change",event=>{const files=[...event.target.files];event.target.value="";attachMusic(files);});
+    $("#musicRandomToggle").addEventListener("change",event=>{state.settings.musicRandom=event.target.checked;state.settings.musicEnabled=true;saveState();renderMusicOptions();});
+    $("#musicLibrarySelect").addEventListener("change",event=>{state.settings.selectedMusicId=event.target.value;state.settings.musicRandom=false;state.settings.musicEnabled=true;saveState();renderMusicOptions();});
+    $("#musicTrackList").addEventListener("click",event=>{const remove=event.target.closest("[data-remove-music]");if(remove)removeMusicTrack(remove.dataset.removeMusic);else{const row=event.target.closest("[data-music-id]");if(row){state.settings.selectedMusicId=row.dataset.musicId;state.settings.musicRandom=false;state.settings.musicEnabled=true;saveState();renderMusicOptions();}}});
+    $("#removeMusicButton").addEventListener("click",async()=>{const id=$("#musicLibrarySelect").value;if(state.settings.musicTracks.some(track=>track.id===id))await removeMusicTrack(id);else toast("Las 10 pistas procedurales integradas no se eliminan.");});
 
     $("#exportBackupButton").addEventListener("click",exportBackup);$("#importBackupInput").addEventListener("change",event=>{const file=event.target.files[0];event.target.value="";importBackup(file);});
     $("#resetEverythingButton").addEventListener("click",async()=>{if(!confirmAction("Se borrarán cartas, decks, multimedia y ajustes locales. ¿Continuar?"))return;localStorage.removeItem(STORAGE_KEY);await mediaDB.clear();location.reload();});
-    $("#clearMediaButton").addEventListener("click",async()=>{if(!confirmAction("Se borrarán todas las imágenes, el fondo y el audio local."))return;await mediaDB.clear();state.cards.forEach(card=>card.imageId=null);state.settings.backgroundId=null;state.settings.backgroundType="";state.settings.backgroundName="";state.settings.musicId=null;state.settings.musicName="";state.settings.musicEnabled=false;saveState();renderCards();applyMediaSettings();toast("Multimedia local eliminada.");});
+    $("#clearMediaButton").addEventListener("click",async()=>{if(!confirmAction("Se borrarán todas las imágenes, el fondo y el audio local."))return;await mediaDB.clear();state.cards.forEach(card=>card.imageId=null);state.settings.backgroundId=null;state.settings.backgroundType="";state.settings.backgroundName="";state.settings.musicId=null;state.settings.musicName="";state.settings.musicTracks=[];state.settings.selectedMusicId=MUSIC.BUILTIN_TRACKS[0].id;state.settings.lastMusicId=null;state.settings.musicEnabled=true;saveState();renderCards();applyMediaSettings();toast("Multimedia local eliminada. Las 10 pistas procedurales permanecen disponibles.");});
   }
 
   function buildEditorButtonPad(){
@@ -1130,5 +1222,5 @@
 
   init().catch(error=>{console.error(error);document.body.innerHTML=`<main style="padding:40px;color:white"><h1>No se pudo iniciar QTE Lab</h1><p>${escapeHtml(error.message)}</p></main>`;});
 
-  window.QTECore={rawPower,variationCoefficient,powerStars,sectionMinimumTime,validateCard,QTEEngine,FormulaRegistry:SYSTEMS.FormulaRegistry,Emblems:EMBLEMS.registry,Animations:ANIMATIONS.registry,CombatVisuals:COMBAT_VISUALS};
+  window.QTECore={rawPower,variationCoefficient,powerStars,sectionMinimumTime,validateCard,QTEEngine,FormulaRegistry:SYSTEMS.FormulaRegistry,Emblems:EMBLEMS.registry,Animations:ANIMATIONS.registry,CombatVisuals:COMBAT_VISUALS,Balance:BALANCE,Music:MUSIC};
 })();

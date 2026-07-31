@@ -23,32 +23,32 @@
   }
 
   class ShadowEmblem extends BaseEmblem {
-    constructor(){ super({id:"shadow",name:"Clan Sombra",icon:"◒",color:"#4a236f",description:"La secuencia desaparece tras comenzar. Un QTE perfecto permite ejecutar otra carta."}); }
-    createRuntime(){ return {hideSequenceAfter:.75, extraCardOnPerfect:true}; }
+    constructor(){ super({id:"shadow",name:"Clan Sombra",icon:"◒",color:"#4a236f",description:"La secuencia desaparece tras comenzar. Un QTE perfecto permite una carta adicional al 65 % de potencia."}); }
+    createRuntime(){ return {hideSequenceAfter:.75, extraCardOnPerfect:true, extraCardMultiplier:.65}; }
   }
 
   class AssassinEmblem extends BaseEmblem {
-    constructor(){ super({id:"assassin",name:"Clan Asesino",icon:"✦",color:"#ff1744",description:"Duplica el daño. Cada error causa al usuario el daño perfecto hipotético de la carta."}); }
-    createRuntime(){ return {outgoingMultiplier:2, selfDamagePerError:true}; }
+    constructor(){ super({id:"assassin",name:"Clan Asesino",icon:"✦",color:"#ff1744",description:"Aumenta el daño un 35 %. Cada error causa autodaño gradual, limitado al 25 % de la vida máxima por turno."}); }
+    createRuntime(){ return {outgoingMultiplier:1.35, selfDamagePerError:true, selfDamageRatePerError:.08, selfDamageCapRate:.25}; }
   }
 
   class HealerEmblem extends BaseEmblem {
-    constructor(){ super({id:"healer",name:"Clan Curandero",icon:"✚",color:"#36e27a",description:"Recupera el 20 % del daño efectivo realmente infligido."}); }
-    createRuntime(){ return {healingRate:.20}; }
+    constructor(){ super({id:"healer",name:"Clan Curandero",icon:"✚",color:"#36e27a",description:"Recupera el 15 % del daño efectivo, con un máximo del 15 % de la vida por turno."}); }
+    createRuntime(){ return {healingRate:.15, healingCapRate:.15}; }
   }
 
   class TempoEmblem extends BaseEmblem {
-    constructor(){ super({id:"tempo",name:"Clan Tempo",icon:"◷",color:"#2196ff",description:"Duplica el tiempo disponible y reduce el daño total un 30 %."}); }
-    createRuntime(){ return {timeMultiplier:2, outgoingMultiplier:.70}; }
+    constructor(){ super({id:"tempo",name:"Clan Tempo",icon:"◷",color:"#2196ff",description:"Aumenta el tiempo disponible un 65 % y reduce el daño total un 25 %."}); }
+    createRuntime(){ return {timeMultiplier:1.65, outgoingMultiplier:.75}; }
   }
 
   class SquireEmblem extends BaseEmblem {
-    constructor(){ super({id:"squire",name:"Clan Escudero",icon:"⬡",color:"#9aa4ad",description:"Reduce automáticamente un 15 % del daño recibido durante el intercambio."}); }
-    createRuntime(){ return {incomingMultiplier:.85}; }
+    constructor(){ super({id:"squire",name:"Clan Escudero",icon:"⬡",color:"#9aa4ad",description:"Reduce automáticamente un 18 % del daño recibido durante el intercambio."}); }
+    createRuntime(){ return {incomingMultiplier:.82}; }
   }
 
   class ChaosEmblem extends BaseEmblem {
-    constructor(){ super({id:"chaos",name:"Clan Caos",icon:"⤨",color:"#ff9d22",description:"Altera los controles de dos secciones en cada ejecución y triplica el daño."}); }
+    constructor(){ super({id:"chaos",name:"Clan Caos",icon:"⤨",color:"#ff9d22",description:"Altera los controles de dos secciones y aumenta el daño un 65 %. Alto riesgo, pero sin capacidad de eliminar con una sola carta."}); }
     createRuntime(context){
       const card = clone(context.card);
       const buttons = context.buttons || [];
@@ -66,15 +66,15 @@
         });
         card.secciones[sectionIndex].botones = card.secciones[sectionIndex].botones.map(button => maps[sectionIndex][button] || button);
       }
-      return {card, outgoingMultiplier:3, chaosMaps:maps, chaosChangedSections:changedSections};
+      return {card, outgoingMultiplier:1.65, chaosMaps:maps, chaosChangedSections:changedSections};
     }
   }
 
   class VengeanceEmblem extends BaseEmblem {
-    constructor(){ super({id:"vengeance",name:"Clan Venganza",icon:"⚔",color:"#8b0000",description:"Con menos del 35 % de vida, la carta obtiene un 25 % de daño adicional."}); }
+    constructor(){ super({id:"vengeance",name:"Clan Venganza",icon:"⚔",color:"#8b0000",description:"Con menos del 35 % de vida, la carta obtiene un 20 % de daño adicional."}); }
     createRuntime(context){
       const active = Number(context.hp || 0) / Math.max(1, Number(context.maxHp || 1)) < .35;
-      return {vengeanceActive:active, outgoingMultiplier:active ? 1.25 : 1};
+      return {vengeanceActive:active, outgoingMultiplier:active ? 1.20 : 1};
     }
   }
 
@@ -105,6 +105,10 @@
         hideSequenceAfter:null,
         extraCardOnPerfect:false,
         selfDamagePerError:false,
+        selfDamageRatePerError:0,
+        selfDamageCapRate:0,
+        healingCapRate:0,
+        extraCardMultiplier:1,
         mirror:false,
         chaosMaps:null,
         chaosChangedSections:[],
