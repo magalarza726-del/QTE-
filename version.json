@@ -1,0 +1,7 @@
+{
+  "app": "QTE Lab",
+  "version": "10.0.1",
+  "build": "10.0.1-20260730",
+  "entry": "index.html",
+  "deployment": "GitHub Pages root"
+}

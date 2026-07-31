@@ -12,7 +12,8 @@
   if (!ANIMATIONS) throw new Error("No se pudo cargar animation/animation-registry.js");
   if (!COMBAT_VISUALS) throw new Error("No se pudo cargar combat/combat-visuals.js");
 
-  const APP_VERSION = "10.0.0";
+  const APP_VERSION = "10.0.1";
+  const BUILD_ID = "10.0.1-20260730";
   // Se conserva la clave v8 para migrar sin perder datos existentes.
   const STORAGE_KEY = "qte-lab-pages-v8";
   const DB_NAME = "qte-lab-media-v8";
