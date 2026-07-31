@@ -16,8 +16,8 @@
   if (!BALANCE) throw new Error("No se pudo cargar combat/balance-system.js");
   if (!MUSIC) throw new Error("No se pudo cargar audio/music-system.js");
 
-  const APP_VERSION = "10.1.0";
-  const BUILD_ID = "10.1.0-20260730";
+  const APP_VERSION = "10.1.1";
+  const BUILD_ID = "10.1.1-20260730";
   // Se conserva la clave v8 para migrar sin perder datos existentes.
   const STORAGE_KEY = "qte-lab-pages-v8";
   const DB_NAME = "qte-lab-media-v8";
@@ -39,8 +39,8 @@
     difficulty:"Normal", musicVolume:35,
     backgroundId:null, backgroundType:"", backgroundName:"",
     backgroundOpacity:25, overlayOpacity:68, backgroundBlur:2, safeMode:true,
-    musicId:null, musicName:"", musicEnabled:true,
-    musicTracks:[], musicRandom:true, selectedMusicId:"proc-neon-rush", lastMusicId:null,
+    musicId:null, musicName:"", musicEnabled:false,
+    musicTracks:[], musicRandom:true, selectedMusicId:"", lastMusicId:null,
     customAnimations:[],
     layoutMode:"auto",
     playerEmblems:["shadow"], enemyEmblems:["assassin"]
@@ -335,12 +335,19 @@
   }
   function normalizeAdvancedSettings(settings){
     const target=settings||{};
-    const tracks=Array.isArray(target.musicTracks)?target.musicTracks.filter(track=>track&&track.id&&track.name).slice(0,20):[];
-    if(target.musicId&&!tracks.some(track=>track.id===target.musicId))tracks.push({id:target.musicId,name:target.musicName||"Pista migrada",source:"upload"});
-    target.musicTracks=tracks;
+    // Desde v10.1.1 la música procede únicamente de archivos importados por el usuario.
+    const tracks=Array.isArray(target.musicTracks)
+      ? target.musicTracks.filter(track=>track&&track.id&&track.name&&!String(track.id).startsWith("proc-")).slice(0,20)
+      : [];
+    if(target.musicId&&!String(target.musicId).startsWith("proc-")&&!tracks.some(track=>track.id===target.musicId)){
+      tracks.push({id:target.musicId,name:target.musicName||"Pista migrada",source:"upload"});
+    }
+    target.musicTracks=tracks.map(track=>({...track,source:"upload"}));
     target.musicRandom=target.musicRandom!==false;
-    target.selectedMusicId=String(target.selectedMusicId||target.musicId||MUSIC.BUILTIN_TRACKS[0].id);
-    target.lastMusicId=target.lastMusicId||null;
+    const requested=String(target.selectedMusicId||target.musicId||"");
+    target.selectedMusicId=tracks.some(track=>track.id===requested)?requested:(tracks[0]?.id||"");
+    target.lastMusicId=tracks.some(track=>track.id===target.lastMusicId)?target.lastMusicId:null;
+    target.musicEnabled=tracks.length>0&&target.musicEnabled!==false;
     target.customAnimations=Array.isArray(target.customAnimations)?target.customAnimations.slice(0,60).map((preset,index)=>({
       id:String(preset?.id||`custom-${index+1}`),name:String(preset?.name||`Animación ${index+1}`),animation:ANIMATIONS.normalize(preset?.animation||preset)
     })):[];
@@ -607,20 +614,42 @@
     renderEditorSections();updateEditorSummary();
   }
   async function saveEditor(){
-    syncEditorAnimationFromUI();
-    editor.card.nombre=$("#editorCardName").value.trim();
-    SYSTEMS.CardSchema.refreshComputed(editor.card);
-    const errors=validateCard(editor.card,editor.index);
-    if(errors.length){const box=$("#editorError");box.innerHTML=errors.map(e=>`• ${escapeHtml(e)}`).join("<br>");box.classList.remove("hidden");return;}
-    const oldName=editor.index===null?null:state.cards[editor.index].nombre;
-    if(editor.index===null)state.cards.push(clone(editor.card));else state.cards[editor.index]=clone(editor.card);
-    if(oldName&&oldName!==editor.card.nombre){
-      Object.keys(state.decks).forEach(name=>state.decks[name]=state.decks[name].map(item=>item===oldName?editor.card.nombre:item));
-      state.playerDeck=state.playerDeck.map(item=>item===oldName?editor.card.nombre:item);
-      state.enemyDeck=state.enemyDeck.map(item=>item===oldName?editor.card.nombre:item);
+    const button=$("#saveCardButton");
+    if(!editor.card||button?.disabled)return false;
+    const originalLabel=button?.textContent||"Guardar carta";
+    if(button){button.disabled=true;button.textContent="Guardando…";}
+    try{
+      // El guardado se controla manualmente: no depende de la validación nativa del <dialog>.
+      syncEditorAnimationFromUI();
+      editor.card.nombre=$("#editorCardName").value.trim();
+      SYSTEMS.CardSchema.refreshComputed(editor.card);
+      const errors=validateCard(editor.card,editor.index);
+      const box=$("#editorError");
+      if(errors.length){box.innerHTML=errors.map(e=>`• ${escapeHtml(e)}`).join("<br>");box.classList.remove("hidden");setEditorTab("mechanics");return false;}
+      box.classList.add("hidden");
+      const oldName=editor.index===null?null:state.cards[editor.index]?.nombre;
+      const savedCard=clone(editor.card);
+      if(editor.index===null){state.cards.push(savedCard);editor.index=state.cards.length-1;}
+      else state.cards[editor.index]=savedCard;
+      if(oldName&&oldName!==savedCard.nombre){
+        Object.keys(state.decks).forEach(name=>state.decks[name]=state.decks[name].map(item=>item===oldName?savedCard.nombre:item));
+        state.playerDeck=state.playerDeck.map(item=>item===oldName?savedCard.nombre:item);
+        state.enemyDeck=state.enemyDeck.map(item=>item===oldName?savedCard.nombre:item);
+      }
+      editor.saved=true;
+      saveState("Carta guardada");
+      closeEditor();renderCards();renderDecks();
+      toast("Carta guardada correctamente.");
+      // La limpieza de una imagen reemplazada no debe bloquear ni cancelar el guardado.
+      if(editor.originalImageId&&editor.originalImageId!==savedCard.imageId){mediaDB.delete(editor.originalImageId).catch(error=>console.warn("No se pudo borrar la imagen anterior",error));}
+      return true;
+    }catch(error){
+      console.error("Error al guardar la carta",error);
+      toast(`No se pudo guardar la carta: ${error?.message||"error inesperado"}`,"error");
+      return false;
+    }finally{
+      if(button){button.disabled=false;button.textContent=originalLabel;}
     }
-    if(editor.originalImageId&&editor.originalImageId!==editor.card.imageId)await mediaDB.delete(editor.originalImageId);
-    editor.saved=true;saveState("Carta guardada");closeEditor();renderCards();renderDecks();toast("Carta guardada correctamente.");
   }
 
   function renderEmblems(){
@@ -701,22 +730,21 @@
     $(side==="player"?"#playerDeckCount":"#enemyDeckCount").textContent=`${count} / ${DECK_SIZE}`;
   }
   function allMusicTracks(){
-    return [
-      ...MUSIC.BUILTIN_TRACKS.map(track=>({...track,source:"procedural"})),
-      ...state.settings.musicTracks.map(track=>({...track,source:"upload"}))
-    ];
+    return state.settings.musicTracks.map(track=>({...track,source:"upload"}));
   }
   function renderMusicOptions(){
     normalizeAdvancedSettings(state.settings);const tracks=allMusicTracks(),select=$("#musicSelect"),library=$("#musicLibrarySelect");
-    const options=tracks.map(track=>`<option value="${escapeHtml(track.id)}">${track.source==="procedural"?"⚙":"♪"} ${escapeHtml(track.name)}</option>`).join("");
-    select.innerHTML=`<option value="">Sin música</option><option value="__random__">Aleatoria · diferente por combate</option>${options}`;
-    select.value=!state.settings.musicEnabled?"":state.settings.musicRandom?"__random__":(tracks.some(track=>track.id===state.settings.selectedMusicId)?state.settings.selectedMusicId:tracks[0]?.id||"");
-    if(library){library.innerHTML=options;library.value=tracks.some(track=>track.id===state.settings.selectedMusicId)?state.settings.selectedMusicId:tracks[0]?.id||"";}
+    const options=tracks.map(track=>`<option value="${escapeHtml(track.id)}">♪ ${escapeHtml(track.name)}</option>`).join("");
+    const randomOption=tracks.length?'<option value="__random__">Aleatoria · diferente por combate</option>':'';
+    select.innerHTML=`<option value="">Sin música</option>${randomOption}${options}`;
+    select.value=!state.settings.musicEnabled?"":state.settings.musicRandom&&tracks.length?"__random__":(tracks.some(track=>track.id===state.settings.selectedMusicId)?state.settings.selectedMusicId:tracks[0]?.id||"");
+    if(library){library.innerHTML=tracks.length?options:'<option value="">Sin pistas importadas</option>';library.disabled=!tracks.length;library.value=tracks.some(track=>track.id===state.settings.selectedMusicId)?state.settings.selectedMusicId:tracks[0]?.id||"";}
     $("#musicVolume").value=state.settings.musicVolume;$("#musicVolumeOutput").textContent=`${state.settings.musicVolume}%`;
-    const randomToggle=$("#musicRandomToggle");if(randomToggle)randomToggle.checked=!!state.settings.musicRandom;
-    const count=$("#musicTrackCount");if(count)count.textContent=`${tracks.length} pistas`;
-    const list=$("#musicTrackList");if(list)list.innerHTML=tracks.map(track=>`<div class="music-track-item ${track.id===state.settings.lastMusicId?"last-played":""}" data-music-id="${escapeHtml(track.id)}"><span>${track.source==="procedural"?"⚙":"♪"}</span><div><strong>${escapeHtml(track.name)}</strong><small>${track.source==="procedural"?"Procedural integrada":"Audio local"}${track.id===state.settings.lastMusicId?" · última reproducida":""}</small></div>${track.source==="upload"?'<button type="button" class="ghost danger-text" data-remove-music="'+escapeHtml(track.id)+'">Eliminar</button>':""}</div>`).join("");
-    const current=tracks.find(track=>track.id===state.settings.selectedMusicId);const fileName=$("#musicFileName");if(fileName)fileName.textContent=state.settings.musicRandom?`${tracks.length} pistas disponibles · selección aleatoria activa`:(current?`Selección manual: ${current.name}`:"Sin música");
+    const randomToggle=$("#musicRandomToggle");if(randomToggle){randomToggle.checked=!!state.settings.musicRandom&&tracks.length>0;randomToggle.disabled=tracks.length<2;}
+    const count=$("#musicTrackCount");if(count)count.textContent=`${tracks.length} pista${tracks.length===1?"":"s"}`;
+    const list=$("#musicTrackList");if(list)list.innerHTML=tracks.length?tracks.map(track=>`<div class="music-track-item ${track.id===state.settings.lastMusicId?"last-played":""}" data-music-id="${escapeHtml(track.id)}"><span>♪</span><div><strong>${escapeHtml(track.name)}</strong><small>Audio importado${track.id===state.settings.lastMusicId?" · última reproducida":""}</small></div><button type="button" class="ghost danger-text" data-remove-music="${escapeHtml(track.id)}">Eliminar</button></div>`).join(""):'<div class="empty-state">Todavía no has importado pistas de música.</div>';
+    const current=tracks.find(track=>track.id===state.settings.selectedMusicId);const fileName=$("#musicFileName");
+    if(fileName)fileName.textContent=!tracks.length?"Sin pistas importadas.":state.settings.musicRandom?`${tracks.length} pistas disponibles · selección aleatoria activa`:(current?`Selección manual: ${current.name}`:"Sin música");
   }
   function renderDecks(){
     state.playerDeck=sanitizeDeck(state.playerDeck);state.enemyDeck=sanitizeDeck(state.enemyDeck);
@@ -784,7 +812,7 @@
     state.settings.musicEnabled=true;saveState("Biblioteca musical guardada");renderMusicOptions();toast(`${Math.min(incoming.length,available)} pista(s) añadida(s).`);
   }
   async function removeMusicTrack(id){
-    const track=state.settings.musicTracks.find(item=>item.id===id);if(!track)return;await mediaDB.delete(id);state.settings.musicTracks=state.settings.musicTracks.filter(item=>item.id!==id);if(state.settings.selectedMusicId===id)state.settings.selectedMusicId=MUSIC.BUILTIN_TRACKS[0].id;if(state.settings.lastMusicId===id)state.settings.lastMusicId=null;saveState("Pista eliminada");renderMusicOptions();
+    const track=state.settings.musicTracks.find(item=>item.id===id);if(!track)return;await mediaDB.delete(id);state.settings.musicTracks=state.settings.musicTracks.filter(item=>item.id!==id);if(state.settings.selectedMusicId===id)state.settings.selectedMusicId=state.settings.musicTracks.find(item=>item.id!==id)?.id||"";if(state.settings.lastMusicId===id)state.settings.lastMusicId=null;if(!state.settings.musicTracks.length)state.settings.musicEnabled=false;saveState("Pista eliminada");renderMusicOptions();
   }
 
   function makeBattleDeck(names, assignments=[]){
@@ -814,10 +842,11 @@
     const chosen=state.settings.musicRandom?MUSIC.chooseRandom(tracks,state.settings.lastMusicId):(tracks.find(track=>track.id===state.settings.selectedMusicId)||tracks[0]);if(!chosen)return null;
     state.settings.lastMusicId=chosen.id;state.settings.selectedMusicId=chosen.id;localStorage.setItem(STORAGE_KEY,JSON.stringify({version:APP_VERSION,cards:state.cards,decks:state.decks,playerDeck:state.playerDeck,enemyDeck:state.enemyDeck,settings:state.settings,enchantments:state.enchantments}));
     const volume=Number(state.settings.musicVolume)/100;
-    if(chosen.source==="procedural"){MUSIC.engine.play(chosen.id,volume);}else{const audio=$("#battleMusic"),url=await mediaDB.url(chosen.id);if(url){audio.src=url;audio.volume=volume;audio.play().catch(()=>toast("El navegador requiere una interacción para iniciar el audio."));}}
+    const audio=$("#battleMusic"),url=await mediaDB.url(chosen.id);
+    if(url){audio.src=url;audio.volume=volume;audio.play().catch(()=>toast("El navegador requiere una interacción para iniciar el audio."));}
     renderMusicOptions();return chosen;
   }
-  function stopBattleMusic(){const audio=$("#battleMusic");audio.pause();audio.currentTime=0;audio.removeAttribute("src");MUSIC.engine.stop();}
+  function stopBattleMusic(){const audio=$("#battleMusic");audio.pause();audio.currentTime=0;audio.removeAttribute("src");}
   function executionRuntime(card,side){
     const battle=state.battle;
     return EMBLEMS.prepareCard(card,card.emblemId,{
@@ -1134,9 +1163,13 @@
       state.cards=migrateCardsToTap(clone(INITIAL.cards));state.decks={...clone(INITIAL.starterDecks),...state.decks};state.playerDeck=clone(INITIAL.starterDecks["Inicial Fácil"]);state.enemyDeck=clone(INITIAL.starterDecks["Inicial Medio"]);rerollEnchantments(false);saveState();renderCards();renderDecks();toast("Cartas iniciales restauradas.");
     });
 
-    // El formulario usa botones controlados para evitar que la validación HTML cierre el diálogo antes de tiempo.
+    // El formulario usa botones controlados: guardar y cancelar no dependen de method="dialog" ni de la validación nativa.
+    const editorForm=$("#cardEditorForm"),saveCardButton=$("#saveCardButton");
+    editorForm.noValidate=true;
     $$('[value="cancel"]',$("#cardEditorDialog")).forEach(button=>{button.type="button";button.addEventListener("click",closeEditor);});
-    $("#cardEditorForm").addEventListener("submit",event=>{event.preventDefault();saveEditor();});
+    saveCardButton.type="button";
+    saveCardButton.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();saveEditor();});
+    editorForm.addEventListener("submit",event=>{event.preventDefault();saveEditor();});
     $(".editor-tabs").addEventListener("click",event=>{const button=event.target.closest("[data-editor-tab]");if(button){renderEditorStatistics();if(button.dataset.editorTab==="animation")renderEditorAnimation();setEditorTab(button.dataset.editorTab);}});
     $("#cardEditorDialog").addEventListener("close",async()=>{if(!editor.saved&&editor.pendingImageId)await mediaDB.delete(editor.pendingImageId);});
     $("#editorCardName").addEventListener("input",updateEditorSummary);
@@ -1181,7 +1214,7 @@
     });
     $("#difficultySelect").addEventListener("change",event=>{state.settings.difficulty=event.target.value;saveState();});
     $("#musicSelect").addEventListener("change",event=>{const value=event.target.value;state.settings.musicEnabled=!!value;state.settings.musicRandom=value==="__random__";if(value&&value!=="__random__")state.settings.selectedMusicId=value;saveState();renderMusicOptions();});
-    $("#musicVolume").addEventListener("input",event=>{state.settings.musicVolume=Number(event.target.value);$("#musicVolumeOutput").textContent=`${state.settings.musicVolume}%`;$("#battleMusic").volume=state.settings.musicVolume/100;MUSIC.engine.setVolume(state.settings.musicVolume/100);saveState();});
+    $("#musicVolume").addEventListener("input",event=>{state.settings.musicVolume=Number(event.target.value);$("#musicVolumeOutput").textContent=`${state.settings.musicVolume}%`;$("#battleMusic").volume=state.settings.musicVolume/100;saveState();});
     $("#launchBattleButton").addEventListener("click",startBattle);$("#battleGoDecks").addEventListener("click",()=>go("decks"));$("#continueBattleButton").addEventListener("click",continueBattle);
     $("#battleHand").addEventListener("click",event=>{const button=event.target.closest('[data-action="select-battle-card"]');if(button)selectBattleCard(Number(button.dataset.index));});
     $$('[data-qte]').forEach(button=>{
@@ -1202,11 +1235,11 @@
     $("#musicRandomToggle").addEventListener("change",event=>{state.settings.musicRandom=event.target.checked;state.settings.musicEnabled=true;saveState();renderMusicOptions();});
     $("#musicLibrarySelect").addEventListener("change",event=>{state.settings.selectedMusicId=event.target.value;state.settings.musicRandom=false;state.settings.musicEnabled=true;saveState();renderMusicOptions();});
     $("#musicTrackList").addEventListener("click",event=>{const remove=event.target.closest("[data-remove-music]");if(remove)removeMusicTrack(remove.dataset.removeMusic);else{const row=event.target.closest("[data-music-id]");if(row){state.settings.selectedMusicId=row.dataset.musicId;state.settings.musicRandom=false;state.settings.musicEnabled=true;saveState();renderMusicOptions();}}});
-    $("#removeMusicButton").addEventListener("click",async()=>{const id=$("#musicLibrarySelect").value;if(state.settings.musicTracks.some(track=>track.id===id))await removeMusicTrack(id);else toast("Las 10 pistas procedurales integradas no se eliminan.");});
+    $("#removeMusicButton").addEventListener("click",async()=>{const id=$("#musicLibrarySelect").value;if(state.settings.musicTracks.some(track=>track.id===id))await removeMusicTrack(id);else toast("No hay una pista importada seleccionada.","error");});
 
     $("#exportBackupButton").addEventListener("click",exportBackup);$("#importBackupInput").addEventListener("change",event=>{const file=event.target.files[0];event.target.value="";importBackup(file);});
     $("#resetEverythingButton").addEventListener("click",async()=>{if(!confirmAction("Se borrarán cartas, decks, multimedia y ajustes locales. ¿Continuar?"))return;localStorage.removeItem(STORAGE_KEY);await mediaDB.clear();location.reload();});
-    $("#clearMediaButton").addEventListener("click",async()=>{if(!confirmAction("Se borrarán todas las imágenes, el fondo y el audio local."))return;await mediaDB.clear();state.cards.forEach(card=>card.imageId=null);state.settings.backgroundId=null;state.settings.backgroundType="";state.settings.backgroundName="";state.settings.musicId=null;state.settings.musicName="";state.settings.musicTracks=[];state.settings.selectedMusicId=MUSIC.BUILTIN_TRACKS[0].id;state.settings.lastMusicId=null;state.settings.musicEnabled=true;saveState();renderCards();applyMediaSettings();toast("Multimedia local eliminada. Las 10 pistas procedurales permanecen disponibles.");});
+    $("#clearMediaButton").addEventListener("click",async()=>{if(!confirmAction("Se borrarán todas las imágenes, el fondo y el audio local."))return;await mediaDB.clear();state.cards.forEach(card=>card.imageId=null);state.settings.backgroundId=null;state.settings.backgroundType="";state.settings.backgroundName="";state.settings.musicId=null;state.settings.musicName="";state.settings.musicTracks=[];state.settings.selectedMusicId="";state.settings.lastMusicId=null;state.settings.musicEnabled=false;saveState();renderCards();renderMusicOptions();applyMediaSettings();toast("Multimedia local eliminada.");});
   }
 
   function buildEditorButtonPad(){

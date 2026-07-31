@@ -1,14 +1,5 @@
 {
   "app": "QTE Lab",
-  "version": "10.1.0",
-  "build": "10.1.0-20260730",
-  "features": [
-    "emblem-rebalance",
-    "30-procedural-animations",
-    "custom-animation-studio",
-    "animation-sequencer",
-    "double-combat-duration",
-    "10-procedural-music-tracks",
-    "random-music-per-battle"
-  ]
+  "version": "10.1.1",
+  "build": "10.1.1-20260730"
 }

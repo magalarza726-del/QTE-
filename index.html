@@ -4,20 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#07111f">
-  <meta name="description" content="QTE Lab v10.1.0: juego estratégico de cartas, emblemas y combate QTE con animaciones procedurales para GitHub Pages.">
+  <meta name="description" content="QTE Lab v10.1.1: juego estratégico de cartas, emblemas y combate QTE con animaciones procedurales para GitHub Pages.">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>QTE Lab v10.1.0 · GitHub Pages</title>
-  <link rel="stylesheet" href="./styles.css?v=10.1.0-20260730">
+  <title>QTE Lab v10.1.1 · GitHub Pages</title>
+  <link rel="stylesheet" href="./styles.css?v=10.1.1-20260730">
 </head>
-<body data-build="10.1.0-20260730">
+<body data-build="10.1.1-20260730">
   <noscript><div class="noscript">QTE Lab necesita JavaScript activado.</div></noscript>
   <div id="app" class="app-shell">
     <header class="topbar">
       <button id="brandHome" class="brand" type="button" aria-label="Ir al inicio">
         <span class="brand-mark">Q</span>
-        <span><strong>QTE Lab</strong><small>GitHub Pages · v10.1.0</small></span>
+        <span><strong>QTE Lab</strong><small>GitHub Pages · v10.1.1</small></span>
       </button>
       <nav id="mainNav" class="main-nav" aria-label="Navegación principal">
         <button data-route="home" class="nav-button active">Inicio</button>
@@ -238,12 +238,12 @@
             <p class="muted">Prueba una imagen clara, una oscura y un video con mucho movimiento. Los datos deben seguir siendo el primer plano.</p>
           </article>
           <article class="panel media-controls music-library-panel">
-            <div class="section-toolbar"><div><h2>Biblioteca de música</h2><p class="muted">Incluye 10 pistas procedurales y admite hasta 20 audios propios.</p></div><span id="musicTrackCount" class="count-pill">10 pistas</span></div>
+            <div class="section-toolbar"><div><h2>Biblioteca de música</h2><p class="muted">Admite hasta 20 pistas de audio importadas por el usuario.</p></div><span id="musicTrackCount" class="count-pill">0 pistas</span></div>
             <label class="toggle-row"><input id="musicRandomToggle" type="checkbox" checked><span><strong>Pista diferente en cada combate</strong><small>La selección aleatoria evita repetir la pista anterior cuando hay alternativas.</small></span></label>
             <div class="upload-row"><label class="file-button">Adjuntar pistas<input id="musicInput" type="file" accept="audio/*" multiple></label><button id="removeMusicButton" class="ghost danger-text">Eliminar seleccionada</button></div>
             <label><span>Pista para selección manual</span><select id="musicLibrarySelect"></select></label>
             <div id="musicTrackList" class="music-track-list"></div>
-            <p id="musicFileName" class="muted">10 pistas procedurales disponibles.</p>
+            <p id="musicFileName" class="muted">Sin pistas importadas.</p>
           </article>
         </div>
       </section>
@@ -262,7 +262,7 @@
   </div>
 
   <dialog id="cardEditorDialog" class="editor-dialog">
-    <form method="dialog" id="cardEditorForm">
+    <form method="dialog" id="cardEditorForm" novalidate>
       <div class="dialog-header"><div><span class="eyebrow">EDITOR DE CARTA</span><h2 id="editorTitle">Nueva carta</h2></div><button value="cancel" class="icon-button" aria-label="Cerrar">×</button></div>
       <div class="editor-tabs" role="tablist"><button type="button" class="active" data-editor-tab="mechanics">Mecánicas</button><button type="button" data-editor-tab="animation">Animación</button><button type="button" data-editor-tab="statistics">Estadísticas</button></div>
       <div id="editorMechanicsTab" class="editor-tab-panel active">
@@ -327,24 +327,24 @@
         </section>
       </div>
       <p id="editorError" class="form-error hidden"></p>
-      <div class="dialog-actions"><button value="cancel" class="ghost">Cancelar</button><button id="saveCardButton" value="default" class="primary">Guardar carta</button></div>
+      <div class="dialog-actions"><button value="cancel" class="ghost">Cancelar</button><button id="saveCardButton" type="button" class="primary">Guardar carta</button></div>
     </form>
   </dialog>
 
   <div id="toastRegion" class="toast-region" aria-live="polite"></div>
   <audio id="battleMusic" loop></audio>
-  <script src="./data.js?v=10.1.0-20260730"></script>
-  <script src="./animation/animation-registry.js?v=10.1.0-20260730"></script>
-  <script src="./particles/particle-pool.js?v=10.1.0-20260730"></script>
-  <script src="./camera/camera-controller.js?v=10.1.0-20260730"></script>
-  <script src="./characters/stickman.js?v=10.1.0-20260730"></script>
-  <script src="./effects/effect-system.js?v=10.1.0-20260730"></script>
-  <script src="./audio/music-system.js?v=10.1.0-20260730"></script>
-  <script src="./game-systems.js?v=10.1.0-20260730"></script>
-  <script src="./emblem-system.js?v=10.1.0-20260730"></script>
-  <script src="./emblems/visual-emblems.js?v=10.1.0-20260730"></script>
-  <script src="./combat/balance-system.js?v=10.1.0-20260730"></script>
-  <script src="./combat/combat-visuals.js?v=10.1.0-20260730"></script>
-  <script src="./main.js?v=10.1.0-20260730"></script>
+  <script src="./data.js?v=10.1.1-20260730"></script>
+  <script src="./animation/animation-registry.js?v=10.1.1-20260730"></script>
+  <script src="./particles/particle-pool.js?v=10.1.1-20260730"></script>
+  <script src="./camera/camera-controller.js?v=10.1.1-20260730"></script>
+  <script src="./characters/stickman.js?v=10.1.1-20260730"></script>
+  <script src="./effects/effect-system.js?v=10.1.1-20260730"></script>
+  <script src="./audio/music-system.js?v=10.1.1-20260730"></script>
+  <script src="./game-systems.js?v=10.1.1-20260730"></script>
+  <script src="./emblem-system.js?v=10.1.1-20260730"></script>
+  <script src="./emblems/visual-emblems.js?v=10.1.1-20260730"></script>
+  <script src="./combat/balance-system.js?v=10.1.1-20260730"></script>
+  <script src="./combat/combat-visuals.js?v=10.1.1-20260730"></script>
+  <script src="./main.js?v=10.1.1-20260730"></script>
 </body>
 </html>

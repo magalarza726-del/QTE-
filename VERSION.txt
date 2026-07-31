@@ -1,3 +1,2 @@
-QTE Lab v10.1.0
-Build: 10.1.0-20260730
-GitHub Pages entry: index.html
+QTE Lab v10.1.1
+Build 10.1.1-20260730
