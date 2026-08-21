@@ -55,7 +55,6 @@
   register({id:"teleport",label:"Teletransporte",trailPart:"torso",teleport:true,impactTimes:c=>impacts(c.impacts,.6,.7),sample:(t,c)=>{const v=clamp(t/.3),a=clamp((t-.42)/.22),r=easeInOut(clamp((t-.78)/.22));return withPose({x:(t<.4?0:c.distance)*(1-r),alpha:t>.28&&t<.48?.08:Math.max(.15,1-Math.sin(Math.PI*v)*.85)*(1-a)+a,scaleX:1-.18*Math.sin(Math.PI*v),scaleY:1+.25*Math.sin(Math.PI*v)});}});
   register({id:"sweep",label:"Barrido",trailPart:"frontFoot",impactTimes:c=>impacts(c.impacts,.5,.72),sample:(t,c)=>{const s=easeInOut(clamp((t-.18)/.62));return withPose({x:c.distance*.08*s,y:12*s,body:.42*s,legFront:lerp(1.28,.02,s),shinFront:.08,legBack:2.12,armFront:.35,armBack:2.72,scaleY:.92});}});
   register({id:"grab",label:"Agarre",trailPart:"frontHand",impactTimes:c=>impacts(c.impacts,.56,.7),sample:(t,c)=>{const r=easeOut(clamp((t-.18)/.36)),p=easeInOut(clamp((t-.58)/.3));return withPose({x:c.distance*.16*r-c.distance*.08*p,body:-.2*r+.35*p,armFront:lerp(.92,.02,r)+.55*p,forearmFront:0,armBack:lerp(2.18,3.1,r)-.55*p,forearmBack:3.14,legFront:1.18,legBack:1.98});}});
-
   register({id:"elbow-strike",label:"Codazo",trailPart:"frontHand",impactTimes:c=>impacts(c.impacts,.5,.64),sample:(t,c)=>{const h=easeOut(clamp((t-.22)/.38)),r=easeInOut(clamp((t-.68)/.3));return withPose({x:c.distance*.11*h*(1-r),body:-.34*h,armFront:lerp(.9,-.5,h),forearmFront:lerp(.1,1.4,h),armBack:2.4,legFront:1.12,legBack:2.02});}});
   register({id:"knee-strike",label:"Rodillazo",trailPart:"frontFoot",impactTimes:c=>impacts(c.impacts,.52,.68),sample:(t,c)=>{const h=easeOut(clamp((t-.2)/.42)),r=easeInOut(clamp((t-.7)/.3));return withPose({x:c.distance*.12*h*(1-r),body:-.18*h,legFront:lerp(1.3,-.45,h)*(1-r)+1.3*r,shinFront:lerp(1.72,1.05,h),armFront:.25,armBack:2.8});}});
   register({id:"flying-kick",label:"Patada voladora",trailPart:"frontFoot",impactTimes:c=>impacts(c.impacts,.64,.78),sample:(t,c)=>{const a=Math.sin(Math.PI*t),m=easeInOut(t);return withPose({x:c.distance*.8*m,y:-c.jumpHeight*.7*a,body:-.35,legFront:.02,shinFront:.02,legBack:2.75,shinBack:2.55,armFront:.3,armBack:2.9});}});
@@ -104,7 +103,7 @@
   function impactTimes(config){const c=normalizeSingle(config);return get(c.type).impactTimes(c);}
   function sequenceOf(config){const normalized=normalize(config);return normalized.mode==="sequence"?normalized.sequence:[{id:"single",animation:normalizeSingle(normalized),pauseAfter:normalized.pauseAfter||0}];}
   function labelFor(config){const normalized=normalize(config);return normalized.mode==="sequence"?(normalized.name||`Secuencia de ${normalized.sequence.length} técnicas`):(normalized.name||labels[normalized.type]||normalized.type);}
-  function totalDuration(config,{scale=1}={}){return sequenceOf(config).reduce((sum,step)=>sum+(step.animation.duration/Math.max(.25,step.animation.speed))*scale+step.pauseAfter,0);}
+  function totalDuration(config,{scale=1}={}){return sequenceOf(config).reduce((sum,step)=>sum+((step.animation.duration/Math.max(.25,step.animation.speed))+step.pauseAfter)*scale,0);}
 
   window.QTEAnimations={
     DEFAULT_ANIMATION,TYPES,labels,registry,register,get,sample,impactTimes,normalize,normalizeSingle,sequenceOf,labelFor,totalDuration,basePose,
