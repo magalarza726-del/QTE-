@@ -8,6 +8,9 @@
   const COMBAT_VISUALS = window.QTECombatVisuals;
   const BALANCE = window.QTEBalance;
   const MUSIC = window.QTEMusic;
+  const UTILS = window.QTEUtils;
+  const STORAGE = window.QTEStorage;
+  const QTEEngine = window.QTEQTEEngine?.QTEEngine;
   if (!INITIAL) throw new Error("No se pudo cargar data.js");
   if (!SYSTEMS) throw new Error("No se pudo cargar game-systems.js");
   if (!EMBLEMS) throw new Error("No se pudo cargar emblem-system.js");
@@ -15,9 +18,12 @@
   if (!COMBAT_VISUALS) throw new Error("No se pudo cargar combat/combat-visuals.js");
   if (!BALANCE) throw new Error("No se pudo cargar combat/balance-system.js");
   if (!MUSIC) throw new Error("No se pudo cargar audio/music-system.js");
+  if (!UTILS) throw new Error("No se pudo cargar core/utils.js");
+  if (!STORAGE?.MediaDB || !STORAGE?.JsonStore) throw new Error("No se pudo cargar storage/*.js");
+  if (!QTEEngine) throw new Error("No se pudo cargar combat/qte-engine.js");
 
-  const APP_VERSION = "10.1.1";
-  const BUILD_ID = "10.1.1-20260730";
+  const APP_VERSION = "10.2.0";
+  const BUILD_ID = "10.2.0-20260821";
   // Se conserva la clave v8 para migrar sin perder datos existentes.
   const STORAGE_KEY = "qte-lab-pages-v8";
   const DB_NAME = "qte-lab-media-v8";
@@ -48,20 +54,7 @@
 
   const $ = (selector, root=document) => root.querySelector(selector);
   const $$ = (selector, root=document) => [...root.querySelectorAll(selector)];
-  const clone = value => JSON.parse(JSON.stringify(value));
-  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-  const round = (value, digits=2) => Number(value.toFixed(digits));
-  const randomId = prefix => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
-  const escapeHtml = value => String(value ?? "").replace(/[&<>'"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[ch]));
-  const shuffle = items => {
-    const array = [...items];
-    for (let i=array.length-1;i>0;i--) {
-      const j = Math.floor(Math.random()*(i+1));
-      [array[i],array[j]]=[array[j],array[i]];
-    }
-    return array;
-  };
-  const randomBetween = (min,max) => min + Math.random()*(max-min);
+  const {clone,clamp,round,randomId,escapeHtml,shuffle,randomBetween}=UTILS;
 
 
   const LAYOUT_MODES = ["auto","desktop","mobile-portrait","mobile-landscape"];
@@ -167,152 +160,8 @@
     return errors;
   }
 
-  class MediaDB {
-    constructor(){ this.db=null; this.urls=new Map(); }
-    open(){
-      return new Promise((resolve,reject)=>{
-        const request=indexedDB.open(DB_NAME,1);
-        request.onupgradeneeded=()=>{
-          const db=request.result;
-          if(!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE,{keyPath:"id"});
-        };
-        request.onsuccess=()=>{this.db=request.result;resolve(this);};
-        request.onerror=()=>reject(request.error);
-      });
-    }
-    transaction(mode="readonly"){ return this.db.transaction(DB_STORE,mode).objectStore(DB_STORE); }
-    put(blob,meta={}){
-      return new Promise((resolve,reject)=>{
-        const id=meta.id||randomId("media");
-        const record={id,blob,name:meta.name||"archivo",type:blob.type||meta.type||"application/octet-stream",createdAt:Date.now()};
-        const request=this.transaction("readwrite").put(record);
-        request.onsuccess=()=>resolve(id); request.onerror=()=>reject(request.error);
-      });
-    }
-    get(id){
-      if(!id) return Promise.resolve(null);
-      return new Promise((resolve,reject)=>{
-        const request=this.transaction().get(id);
-        request.onsuccess=()=>resolve(request.result||null); request.onerror=()=>reject(request.error);
-      });
-    }
-    getAll(){
-      return new Promise((resolve,reject)=>{
-        const request=this.transaction().getAll();
-        request.onsuccess=()=>resolve(request.result||[]); request.onerror=()=>reject(request.error);
-      });
-    }
-    delete(id){
-      if(!id) return Promise.resolve();
-      this.revoke(id);
-      return new Promise((resolve,reject)=>{
-        const request=this.transaction("readwrite").delete(id);
-        request.onsuccess=()=>resolve(); request.onerror=()=>reject(request.error);
-      });
-    }
-    clear(){
-      this.urls.forEach(url=>URL.revokeObjectURL(url)); this.urls.clear();
-      return new Promise((resolve,reject)=>{
-        const request=this.transaction("readwrite").clear();
-        request.onsuccess=()=>resolve(); request.onerror=()=>reject(request.error);
-      });
-    }
-    async url(id){
-      if(!id) return "";
-      if(this.urls.has(id)) return this.urls.get(id);
-      const record=await this.get(id);
-      if(!record) return "";
-      const url=URL.createObjectURL(record.blob);
-      this.urls.set(id,url);
-      return url;
-    }
-    revoke(id){ const url=this.urls.get(id); if(url){URL.revokeObjectURL(url);this.urls.delete(id);} }
-  }
-
-  class QTEEngine {
-    constructor(card){
-      this.card=clone(card);
-      this.currentSectionIndex=0;
-      this.currentButtonIndex=0;
-      this.correctCount=0;
-      this.incorrectCount=0;
-      this.missedCount=0;
-      this.startedAt=0;
-      this.sectionStartedAt=0;
-      this.finishedAt=0;
-      this.active=false;
-      this.finished=false;
-      this.finishReason="";
-      this.result=null;
-    }
-    now(){ return performance.now()/1000; }
-    get currentSection(){ return this.card.secciones[this.currentSectionIndex]||null; }
-    get expectedAction(){
-      const section=this.currentSection;
-      if(!section) return null;
-      const value=section.botones[this.currentButtonIndex];
-      return value===undefined ? null : normalizeAction(value);
-    }
-    get elapsedTime(){ if(!this.startedAt)return 0; return Math.max(0,(this.finished?this.finishedAt:this.now())-this.startedAt); }
-    get sectionRemaining(){
-      if(!this.currentSection||!this.active)return 0;
-      return Math.max(0,Number(this.currentSection.tiempo)-(this.now()-this.sectionStartedAt));
-    }
-    start(){
-      const now=this.now();
-      this.currentSectionIndex=0;this.currentButtonIndex=0;this.correctCount=0;this.incorrectCount=0;this.missedCount=0;
-      this.startedAt=now;this.sectionStartedAt=now;this.finishedAt=0;this.active=true;this.finished=false;this.finishReason="";this.result=null;
-    }
-    begin(button){
-      if(!this.active||this.finished)return {correct:false,finished:this.finished};
-      this.update(); if(this.finished)return {correct:false,finished:true};
-      const action=this.expectedAction;
-      if(!action){this.finish("sin_secuencia");return {correct:false,finished:true};}
-      if(button!==action.button){this.incorrectCount++;return {correct:false,expected:action.button};}
-      const changed=this.complete(this.now());
-      return {correct:true,actionCompleted:true,sectionChanged:changed,finished:this.finished,expected:action.button};
-    }
-    update(){
-      if(!this.active||this.finished)return this.finished;
-      const now=this.now();
-      while(this.active&&!this.finished){
-        const section=this.currentSection;
-        if(!section){this.finish("completado",now);break;}
-        const deadline=this.sectionStartedAt+Number(section.tiempo);
-        if(now<deadline)break;
-        this.missedCount+=Math.max(0,section.botones.length-this.currentButtonIndex);
-        this.currentSectionIndex++;this.currentButtonIndex=0;
-        if(this.currentSectionIndex>=this.card.secciones.length){this.finish("tiempo_agotado",now);break;}
-        this.sectionStartedAt=deadline;
-      }
-      return this.finished;
-    }
-    complete(now){
-      this.correctCount++;this.currentButtonIndex++;
-      let changed=false;
-      const section=this.currentSection;
-      if(section&&this.currentButtonIndex>=section.botones.length){
-        changed=true;this.currentSectionIndex++;this.currentButtonIndex=0;
-        if(this.currentSectionIndex>=this.card.secciones.length)this.finish("completado",now);
-        else this.sectionStartedAt=now;
-      }
-      return changed;
-    }
-    finish(reason,now=null){
-      if(this.finished)return;
-      const at=now??this.now();
-      this.active=false;this.finished=true;this.finishReason=reason;this.finishedAt=at;
-      const real=Math.max(0,this.finishedAt-this.startedAt);
-      const coefficient=variationCoefficient(this.card);
-      this.result={
-        correct:this.correctCount,incorrect:this.incorrectCount,missed:this.missedCount,total:cardTotalButtons(this.card),
-        realTime:real,timeLimit:cardTotalTime(this.card),accuracy:accuracy(this.correctCount,cardTotalButtons(this.card)),
-        coefficient,netPower:netPower(this.correctCount,real,coefficient),damage:Math.max(0,netPower(this.correctCount,real,coefficient)),reason
-      };
-    }
-  }
-
-  const mediaDB=new MediaDB();
+  const mediaDB=new STORAGE.MediaDB({dbName:DB_NAME,storeName:DB_STORE,version:1});
+  const stateStore=new STORAGE.JsonStore(STORAGE_KEY);
   const state={
     cards:[],decks:{},playerDeck:[],enemyDeck:[],
     settings:clone(DEFAULT_SETTINGS),
@@ -357,30 +206,77 @@
   function loadState(){
     const fallback=defaultState();
     try{
-      const stored=JSON.parse(localStorage.getItem(STORAGE_KEY)||"null");
+      const stored=stateStore.read();
       if(!stored)Object.assign(state,fallback);
-      else {
-        state.cards=Array.isArray(stored.cards)?migrateCardsToTap(stored.cards):fallback.cards;
-        state.decks=stored.decks&&typeof stored.decks==="object"?stored.decks:fallback.decks;
-        state.playerDeck=Array.isArray(stored.playerDeck)?stored.playerDeck:fallback.playerDeck;
-        state.enemyDeck=Array.isArray(stored.enemyDeck)?stored.enemyDeck:fallback.enemyDeck;
-        state.settings=normalizeAdvancedSettings({...fallback.settings,...stored.settings});
-        state.settings.playerEmblems=normalizeEmblemSelection(state.settings.playerEmblems,["shadow"]);
-        state.settings.enemyEmblems=normalizeEmblemSelection(state.settings.enemyEmblems,["assassin"]);
-        state.enchantments=stored.enchantments&&typeof stored.enchantments==="object"
-          ? {player:Array.isArray(stored.enchantments.player)?stored.enchantments.player:[],enemy:Array.isArray(stored.enchantments.enemy)?stored.enchantments.enemy:[]}
-          : {player:[],enemy:[]};
-      }
-    }catch(error){console.warn(error);Object.assign(state,fallback);}
+      else applyPersistentPayload(stored,fallback);
+    }catch(error){
+      console.warn("No se pudo leer el estado local; se usarán valores iniciales.",error);
+      Object.assign(state,fallback);
+    }
   }
-  function saveState(message="Guardado local"){
+  function makeStatePayload(){
     normalizeAdvancedSettings(state.settings);
     state.cards.forEach(card=>SYSTEMS.CardSchema.refreshComputed(card));
-    const payload={version:APP_VERSION,cards:state.cards,decks:state.decks,playerDeck:state.playerDeck,enemyDeck:state.enemyDeck,settings:state.settings,enchantments:state.enchantments};
-    localStorage.setItem(STORAGE_KEY,JSON.stringify(payload));
+    return {version:APP_VERSION,cards:state.cards,decks:state.decks,playerDeck:state.playerDeck,enemyDeck:state.enemyDeck,settings:state.settings,enchantments:state.enchantments};
+  }
+  function applyPersistentPayload(stored,fallback=defaultState()){
+    state.cards=Array.isArray(stored?.cards)?migrateCardsToTap(stored.cards):fallback.cards;
+    state.decks=stored?.decks&&typeof stored.decks==="object"?stored.decks:fallback.decks;
+    state.playerDeck=Array.isArray(stored?.playerDeck)?stored.playerDeck:fallback.playerDeck;
+    state.enemyDeck=Array.isArray(stored?.enemyDeck)?stored.enemyDeck:fallback.enemyDeck;
+    state.settings=normalizeAdvancedSettings({...fallback.settings,...stored?.settings});
+    state.settings.playerEmblems=normalizeEmblemSelection(state.settings.playerEmblems,["shadow"]);
+    state.settings.enemyEmblems=normalizeEmblemSelection(state.settings.enemyEmblems,["assassin"]);
+    state.enchantments=stored?.enchantments&&typeof stored.enchantments==="object"
+      ? {player:Array.isArray(stored.enchantments.player)?stored.enchantments.player:[],enemy:Array.isArray(stored.enchantments.enemy)?stored.enchantments.enemy:[]}
+      : {player:[],enemy:[]};
+  }
+  function markSaveStatus(message,isError=false){
     const status=$("#saveStatus");
-    status.textContent=message; clearTimeout(saveState.timer); saveState.timer=setTimeout(()=>status.textContent="Guardado local",1300);
+    if(!status)return;
+    status.textContent=message;
+    status.classList.toggle("save-error",!!isError);
+    clearTimeout(saveState.timer);
+    if(!isError)saveState.timer=setTimeout(()=>{status.textContent="Guardado local";status.classList.remove("save-error");},1300);
+  }
+  function persistStateOrThrow(message="Guardado local"){
+    const payload=makeStatePayload();
+    stateStore.write(payload);
+    markSaveStatus(message,false);
     updateHomeStats();
+    return payload;
+  }
+  function saveState(message="Guardado local",{notifyError=true}={}){
+    try{persistStateOrThrow(message);return true;}
+    catch(error){
+      console.error("No se pudo persistir el estado local",error);
+      markSaveStatus("No guardado",true);
+      if(notifyError)toast(STORAGE.describeStorageError?.(error)||error?.message||"No se pudo guardar el estado local.","error");
+      return false;
+    }
+  }
+  function snapshotPersistentState(){return clone(makeStatePayload());}
+  function restorePersistentState(snapshot){applyPersistentPayload(snapshot,defaultState());}
+  async function reconcileMediaState(){
+    const records=await mediaDB.getAll();
+    const existing=new Set(records.map(record=>record.id));
+    let changed=false;
+    state.cards.forEach(card=>{if(card.imageId&&!existing.has(card.imageId)){card.imageId=null;changed=true;}});
+    if(state.settings.backgroundId&&!existing.has(state.settings.backgroundId)){state.settings.backgroundId=null;state.settings.backgroundType="";state.settings.backgroundName="";changed=true;}
+    const before=state.settings.musicTracks.length;
+    state.settings.musicTracks=state.settings.musicTracks.filter(track=>existing.has(track.id));
+    if(state.settings.musicTracks.length!==before)changed=true;
+    if(!state.settings.musicTracks.some(track=>track.id===state.settings.selectedMusicId)){state.settings.selectedMusicId=state.settings.musicTracks[0]?.id||"";changed=true;}
+    if(state.settings.lastMusicId&&!state.settings.musicTracks.some(track=>track.id===state.settings.lastMusicId)){state.settings.lastMusicId=null;changed=true;}
+    if(!state.settings.musicTracks.length&&state.settings.musicEnabled){state.settings.musicEnabled=false;changed=true;}
+    const referenced=new Set([
+      ...state.cards.map(card=>card.imageId).filter(Boolean),
+      state.settings.backgroundId,
+      ...state.settings.musicTracks.map(track=>track.id)
+    ].filter(Boolean));
+    const orphanIds=records.map(record=>record.id).filter(id=>!referenced.has(id));
+    if(orphanIds.length)await mediaDB.deleteMany(orphanIds).catch(error=>console.warn("No se pudieron limpiar blobs huérfanos",error));
+    if(changed)saveState("Multimedia reconciliada",{notifyError:false});
   }
 
   function toast(message,type="info"){
@@ -618,14 +514,18 @@
     if(!editor.card||button?.disabled)return false;
     const originalLabel=button?.textContent||"Guardar carta";
     if(button){button.disabled=true;button.textContent="Guardando…";}
+    const snapshot=snapshotPersistentState();
+    const originalIndex=editor.index;
     try{
-      // El guardado se controla manualmente: no depende de la validación nativa del <dialog>.
       syncEditorAnimationFromUI();
       editor.card.nombre=$("#editorCardName").value.trim();
       SYSTEMS.CardSchema.refreshComputed(editor.card);
       const errors=validateCard(editor.card,editor.index);
       const box=$("#editorError");
-      if(errors.length){box.innerHTML=errors.map(e=>`• ${escapeHtml(e)}`).join("<br>");box.classList.remove("hidden");setEditorTab("mechanics");return false;}
+      if(errors.length){
+        box.innerHTML=errors.map(e=>`• ${escapeHtml(e)}`).join("<br>");
+        box.classList.remove("hidden");setEditorTab("mechanics");return false;
+      }
       box.classList.add("hidden");
       const oldName=editor.index===null?null:state.cards[editor.index]?.nombre;
       const savedCard=clone(editor.card);
@@ -636,16 +536,19 @@
         state.playerDeck=state.playerDeck.map(item=>item===oldName?savedCard.nombre:item);
         state.enemyDeck=state.enemyDeck.map(item=>item===oldName?savedCard.nombre:item);
       }
+      persistStateOrThrow("Carta guardada");
       editor.saved=true;
-      saveState("Carta guardada");
+      const oldImage=editor.originalImageId;
+      const newImage=savedCard.imageId;
       closeEditor();renderCards();renderDecks();
       toast("Carta guardada correctamente.");
-      // La limpieza de una imagen reemplazada no debe bloquear ni cancelar el guardado.
-      if(editor.originalImageId&&editor.originalImageId!==savedCard.imageId){mediaDB.delete(editor.originalImageId).catch(error=>console.warn("No se pudo borrar la imagen anterior",error));}
+      if(oldImage&&oldImage!==newImage)mediaDB.delete(oldImage).catch(error=>console.warn("No se pudo borrar la imagen anterior",error));
       return true;
     }catch(error){
+      restorePersistentState(snapshot);editor.index=originalIndex;
       console.error("Error al guardar la carta",error);
-      toast(`No se pudo guardar la carta: ${error?.message||"error inesperado"}`,"error");
+      markSaveStatus("No guardado",true);
+      toast(`No se pudo guardar la carta: ${STORAGE.describeStorageError?.(error)||error?.message||"error inesperado"}`,"error");
       return false;
     }finally{
       if(button){button.disabled=false;button.textContent=originalLabel;}
@@ -753,9 +656,11 @@
   }
   function loadPreset(side){
     const select=$(side==="player"?"#playerPresetSelect":"#enemyPresetSelect");
-    const deck=clone(state.decks[select.value]||[]);
+    const name=select?.value;
+    if(!name||!Array.isArray(state.decks[name])){toast("No hay un deck guardado seleccionado.","error");return;}
+    const deck=clone(state.decks[name]);
     if(side==="player")state.playerDeck=sanitizeDeck(deck);else state.enemyDeck=sanitizeDeck(deck);
-    saveState();renderDeckSlots(side);toast(`Deck “${select.value}” cargado.`);
+    saveState();renderDeckSlots(side);toast(`Deck “${name}” cargado.`);
   }
   function randomDeck(side){
     if(state.cards.length<DECK_SIZE){toast("Se necesitan al menos 12 cartas.","error");return;}
@@ -772,26 +677,28 @@
   }
 
   async function applyMediaSettings(){
-    if(state.settings.safeMode){
-      state.settings.backgroundOpacity=Math.min(35,Number(state.settings.backgroundOpacity));
-      state.settings.overlayOpacity=Math.max(55,Number(state.settings.overlayOpacity));
-    }
-    document.documentElement.style.setProperty("--battle-media-opacity",String(Number(state.settings.backgroundOpacity)/100));
-    document.documentElement.style.setProperty("--battle-overlay-opacity",String(Number(state.settings.overlayOpacity)/100));
-    document.documentElement.style.setProperty("--battle-media-blur",`${Number(state.settings.backgroundBlur)}px`);
+    const requestedBackground=clamp(Number(state.settings.backgroundOpacity)||0,0,100);
+    const requestedOverlay=clamp(Number(state.settings.overlayOpacity)||0,0,90);
+    const effectiveBackground=state.settings.safeMode?Math.min(35,requestedBackground):requestedBackground;
+    const effectiveOverlay=state.settings.safeMode?Math.max(55,requestedOverlay):requestedOverlay;
+    const blur=clamp(Number(state.settings.backgroundBlur)||0,0,16);
+    document.documentElement.style.setProperty("--battle-media-opacity",String(effectiveBackground/100));
+    document.documentElement.style.setProperty("--battle-overlay-opacity",String(effectiveOverlay/100));
+    document.documentElement.style.setProperty("--battle-media-blur",`${blur}px`);
     $("#safeModeToggle").checked=!!state.settings.safeMode;
-    $("#backgroundOpacity").value=state.settings.backgroundOpacity;$("#backgroundOpacityOutput").textContent=`${state.settings.backgroundOpacity}%`;
-    $("#overlayOpacity").value=state.settings.overlayOpacity;$("#overlayOpacityOutput").textContent=`${state.settings.overlayOpacity}%`;
-    $("#backgroundBlur").value=state.settings.backgroundBlur;$("#backgroundBlurOutput").textContent=`${state.settings.backgroundBlur} px`;
+    $("#backgroundOpacity").value=requestedBackground;$("#backgroundOpacityOutput").textContent=`${requestedBackground}%`;
+    $("#overlayOpacity").value=requestedOverlay;$("#overlayOpacityOutput").textContent=`${requestedOverlay}%`;
+    $("#backgroundBlur").value=blur;$("#backgroundBlurOutput").textContent=`${blur} px`;
     $("#safeModeNotice").classList.toggle("hidden",!state.settings.safeMode);
-    $("#backgroundFileName").textContent=state.settings.backgroundId?`${state.settings.backgroundName} · ${state.settings.backgroundType.startsWith("video/")?"Video":"Imagen"}`:"Sin archivo cargado.";
+    $("#backgroundFileName").textContent=state.settings.backgroundId?`${state.settings.backgroundName} · ${String(state.settings.backgroundType).startsWith("video/")?"Video":"Imagen"}`:"Sin archivo cargado.";
     const url=await mediaDB.url(state.settings.backgroundId);
-    const isVideo=state.settings.backgroundType.startsWith("video/");
+    const isVideo=String(state.settings.backgroundType||"").startsWith("video/");
     for(const prefix of ["battleBackground","previewBackground"]){
       const img=$(`#${prefix}Image`),video=$(`#${prefix}Video`);
       img.classList.add("hidden");video.classList.add("hidden");video.pause();
-      if(url&&isVideo){video.src=url;video.classList.remove("hidden");video.play().catch(()=>{});}
-      else if(url){img.src=url;img.classList.remove("hidden");}
+      if(!url){img.removeAttribute("src");video.removeAttribute("src");video.load?.();continue;}
+      if(isVideo){img.removeAttribute("src");if(video.src!==url)video.src=url;video.classList.remove("hidden");video.play().catch(()=>{});}
+      else {video.removeAttribute("src");video.load?.();if(img.src!==url)img.src=url;img.classList.remove("hidden");}
     }
     renderMusicOptions();
   }
@@ -799,20 +706,51 @@
     if(!file)return;
     if(!(file.type.startsWith("image/")||file.type.startsWith("video/"))){toast("Selecciona una imagen o un video compatible.","error");return;}
     if(file.type.startsWith("video/")&&file.size>250*1024*1024&&!confirmAction("El video supera 250 MB y el respaldo será muy pesado. ¿Continuar?"))return;
+    const snapshot=snapshotPersistentState();
     const old=state.settings.backgroundId;
-    const id=await mediaDB.put(file,{name:file.name});
-    state.settings.backgroundId=id;state.settings.backgroundType=file.type;state.settings.backgroundName=file.name;
-    if(old)await mediaDB.delete(old);
-    saveState("Fondo guardado");await applyMediaSettings();toast("Fondo de batalla actualizado.");
+    let id=null;
+    try{
+      id=await mediaDB.put(file,{name:file.name});
+      state.settings.backgroundId=id;state.settings.backgroundType=file.type;state.settings.backgroundName=file.name;
+      persistStateOrThrow("Fondo guardado");
+      if(old&&old!==id)mediaDB.delete(old).catch(error=>console.warn("No se pudo limpiar el fondo anterior",error));
+      await applyMediaSettings();toast("Fondo de batalla actualizado.");
+    }catch(error){
+      restorePersistentState(snapshot);
+      if(id&&id!==old)await mediaDB.delete(id).catch(()=>{});
+      console.error(error);markSaveStatus("No guardado",true);toast(STORAGE.describeStorageError?.(error)||error?.message||"No se pudo guardar el fondo.","error");
+    }
   }
   async function attachMusic(files){
-    const incoming=[...(files||[])].filter(file=>file?.type?.startsWith("audio/"));if(!incoming.length){toast("Selecciona uno o varios archivos de audio.","error");return;}
-    const available=Math.max(0,20-state.settings.musicTracks.length);if(!available){toast("La biblioteca local admite hasta 20 pistas propias.","error");return;}
-    for(const file of incoming.slice(0,available)){const id=await mediaDB.put(file,{name:file.name});state.settings.musicTracks.push({id,name:file.name,source:"upload"});state.settings.selectedMusicId=id;}
-    state.settings.musicEnabled=true;saveState("Biblioteca musical guardada");renderMusicOptions();toast(`${Math.min(incoming.length,available)} pista(s) añadida(s).`);
+    const incoming=[...(files||[])].filter(file=>file?.type?.startsWith("audio/"));
+    if(!incoming.length){toast("Selecciona uno o varios archivos de audio.","error");return;}
+    const available=Math.max(0,20-state.settings.musicTracks.length);
+    if(!available){toast("La biblioteca local admite hasta 20 pistas propias.","error");return;}
+    const snapshot=snapshotPersistentState(),newIds=[];
+    try{
+      for(const file of incoming.slice(0,available)){
+        const id=await mediaDB.put(file,{name:file.name});newIds.push(id);
+        state.settings.musicTracks.push({id,name:file.name,source:"upload"});state.settings.selectedMusicId=id;
+      }
+      state.settings.musicEnabled=true;persistStateOrThrow("Biblioteca musical guardada");renderMusicOptions();toast(`${newIds.length} pista(s) añadida(s).`);
+    }catch(error){
+      restorePersistentState(snapshot);await mediaDB.deleteMany(newIds).catch(()=>{});
+      console.error(error);markSaveStatus("No guardado",true);toast(STORAGE.describeStorageError?.(error)||error?.message||"No se pudo guardar la biblioteca musical.","error");
+    }
   }
   async function removeMusicTrack(id){
-    const track=state.settings.musicTracks.find(item=>item.id===id);if(!track)return;await mediaDB.delete(id);state.settings.musicTracks=state.settings.musicTracks.filter(item=>item.id!==id);if(state.settings.selectedMusicId===id)state.settings.selectedMusicId=state.settings.musicTracks.find(item=>item.id!==id)?.id||"";if(state.settings.lastMusicId===id)state.settings.lastMusicId=null;if(!state.settings.musicTracks.length)state.settings.musicEnabled=false;saveState("Pista eliminada");renderMusicOptions();
+    const track=state.settings.musicTracks.find(item=>item.id===id);if(!track)return;
+    const snapshot=snapshotPersistentState();
+    try{
+      state.settings.musicTracks=state.settings.musicTracks.filter(item=>item.id!==id);
+      if(state.settings.selectedMusicId===id)state.settings.selectedMusicId=state.settings.musicTracks[0]?.id||"";
+      if(state.settings.lastMusicId===id)state.settings.lastMusicId=null;
+      if(!state.settings.musicTracks.length)state.settings.musicEnabled=false;
+      persistStateOrThrow("Pista eliminada");renderMusicOptions();
+      mediaDB.delete(id).catch(error=>console.warn("La pista quedó huérfana en IndexedDB",error));
+    }catch(error){
+      restorePersistentState(snapshot);console.error(error);markSaveStatus("No guardado",true);toast(STORAGE.describeStorageError?.(error)||error?.message||"No se pudo eliminar la pista.","error");
+    }
   }
 
   function makeBattleDeck(names, assignments=[]){
@@ -840,7 +778,9 @@
   async function playBattleMusic(){
     stopBattleMusic();if(!state.settings.musicEnabled)return null;const tracks=allMusicTracks();if(!tracks.length)return null;
     const chosen=state.settings.musicRandom?MUSIC.chooseRandom(tracks,state.settings.lastMusicId):(tracks.find(track=>track.id===state.settings.selectedMusicId)||tracks[0]);if(!chosen)return null;
-    state.settings.lastMusicId=chosen.id;state.settings.selectedMusicId=chosen.id;localStorage.setItem(STORAGE_KEY,JSON.stringify({version:APP_VERSION,cards:state.cards,decks:state.decks,playerDeck:state.playerDeck,enemyDeck:state.enemyDeck,settings:state.settings,enchantments:state.enchantments}));
+    state.settings.lastMusicId=chosen.id;state.settings.selectedMusicId=chosen.id;
+    // Guardar la rotación musical no debe duplicar la lógica de persistencia.
+    saveState("Pista seleccionada",{notifyError:false});
     const volume=Number(state.settings.musicVolume)/100;
     const audio=$("#battleMusic"),url=await mediaDB.url(chosen.id);
     if(url){audio.src=url;audio.volume=volume;audio.play().catch(()=>toast("El navegador requiere una interacción para iniciar el audio."));}
@@ -872,7 +812,9 @@
     if(playerNames.length!==DECK_SIZE||enemyNames.length!==DECK_SIZE){toast("Ambos decks deben tener exactamente 12 cartas válidas.","error");go("decks");return;}
     state.settings.playerEmblems=normalizeEmblemSelection(state.settings.playerEmblems,["shadow"]);
     state.settings.enemyEmblems=normalizeEmblemSelection(state.settings.enemyEmblems,["assassin"]);
-    rerollEnchantments(true);
+    // La partida usa exactamente los encantamientos previsualizados por el jugador.
+    // Solo se genera una distribución si el estado todavía no contiene una válida.
+    ensureEnchantments();
     state.battle={
       playerHp:MAX_HP,enemyHp:MAX_HP,turn:1,phase:"select",
       playerDeck:makeBattleDeck(playerNames,state.enchantments.player),enemyDeck:makeBattleDeck(enemyNames,state.enchantments.enemy),
@@ -946,7 +888,7 @@
     $("#liveTimeRemaining").textContent=`${engine.sectionRemaining.toFixed(2)} s`;
     $("#liveCorrect").textContent=engine.correctCount;
     $("#liveIncorrect").textContent=engine.incorrectCount;
-    $("#liveAccuracy").textContent=`${accuracy(engine.correctCount,Math.max(1,engine.correctCount+engine.incorrectCount+engine.missedCount)).toFixed(1)}%`;
+    $("#liveAccuracy").textContent=`${accuracy(engine.correctCount,Math.max(1,cardTotalButtons(engine.card))).toFixed(1)}%`;
     $("#liveNetPower").textContent=netPower(engine.correctCount,Math.max(engine.elapsedTime,.001),variationCoefficient(engine.card)).toFixed(4);
     const hidden=runtime?.hideSequenceAfter!=null&&engine.elapsedTime>=runtime.hideSequenceAfter;
     $("#qteSequence").classList.toggle("sequence-hidden",hidden);
@@ -1114,16 +1056,31 @@
     if(!file)return;
     try{
       const payload=JSON.parse(await file.text());
-      if(payload.app!=="QTE Lab"||!payload.state||!Array.isArray(payload.state.cards))throw new Error("Formato de respaldo inválido.");
+      if(payload.app!=="QTE Lab"||!payload.state||!Array.isArray(payload.state.cards)||payload.state.cards.length<DECK_SIZE)throw new Error("Formato de respaldo inválido: se requieren al menos 12 cartas.");
       if(!confirmAction("Se reemplazarán los datos actuales. ¿Continuar?"))return;
-      await mediaDB.clear();
-      for(const item of payload.media||[])await mediaDB.put(dataUrlToBlob(item.dataUrl),{id:item.id,name:item.name,type:item.type});
-      state.cards=migrateCardsToTap(payload.state.cards);state.decks=payload.state.decks||{};state.playerDeck=payload.state.playerDeck||[];state.enemyDeck=payload.state.enemyDeck||[];state.settings=normalizeAdvancedSettings({...defaultState().settings,...payload.state.settings});
-      state.settings.playerEmblems=normalizeEmblemSelection(state.settings.playerEmblems,["shadow"]);state.settings.enemyEmblems=normalizeEmblemSelection(state.settings.enemyEmblems,["assassin"]);
-      state.enchantments=payload.state.enchantments||{player:[],enemy:[]};ensureEnchantments();
-      saveState("Respaldo importado");location.reload();
-    }catch(error){console.error(error);toast(error.message||"No se pudo importar el respaldo.","error");}
+      // Validar y decodificar todo antes de tocar los datos actuales.
+      const replacementMedia=(payload.media||[]).map(item=>{
+        if(!item?.id||typeof item.dataUrl!=="string")throw new Error("El respaldo contiene un archivo multimedia inválido.");
+        const blob=dataUrlToBlob(item.dataUrl);
+        return {id:String(item.id),blob,name:item.name||"archivo",type:item.type||blob.type,createdAt:item.createdAt||Date.now()};
+      });
+      const oldState=snapshotPersistentState();
+      const oldMedia=await mediaDB.getAll();
+      try{
+        await mediaDB.replaceAll(replacementMedia);
+        state.cards=migrateCardsToTap(payload.state.cards);state.decks=payload.state.decks||{};state.playerDeck=payload.state.playerDeck||[];state.enemyDeck=payload.state.enemyDeck||[];state.settings=normalizeAdvancedSettings({...defaultState().settings,...payload.state.settings});
+        state.settings.playerEmblems=normalizeEmblemSelection(state.settings.playerEmblems,["shadow"]);state.settings.enemyEmblems=normalizeEmblemSelection(state.settings.enemyEmblems,["assassin"]);
+        state.enchantments=payload.state.enchantments||{player:[],enemy:[]};ensureEnchantments();
+        persistStateOrThrow("Respaldo importado");
+      }catch(error){
+        restorePersistentState(oldState);
+        await mediaDB.replaceAll(oldMedia).catch(rollbackError=>console.error("No se pudo restaurar la multimedia anterior",rollbackError));
+        throw error;
+      }
+      location.reload();
+    }catch(error){console.error(error);markSaveStatus("No guardado",true);toast(error.message||"No se pudo importar el respaldo.","error");}
   }
+
 
   function bindEvents(){
     $("#brandHome").addEventListener("click",()=>go("home"));
@@ -1151,16 +1108,24 @@
         const card=state.cards[index];if(!card)return;
         if(state.cards.length<=DECK_SIZE){toast("Debe permanecer un mínimo de 12 cartas.","error");return;}
         if(!confirmAction(`¿Eliminar “${card.nombre}”?`))return;
-        if(card.imageId)await mediaDB.delete(card.imageId);state.cards.splice(index,1);
-        Object.keys(state.decks).forEach(name=>state.decks[name]=state.decks[name].filter(item=>item!==card.nombre));
-        state.playerDeck=state.playerDeck.filter(item=>item!==card.nombre);state.enemyDeck=state.enemyDeck.filter(item=>item!==card.nombre);
-        saveState("Carta eliminada");renderCards();renderDecks();
+        const snapshot=snapshotPersistentState();
+        try{
+          state.cards.splice(index,1);
+          Object.keys(state.decks).forEach(name=>state.decks[name]=state.decks[name].filter(item=>item!==card.nombre));
+          state.playerDeck=state.playerDeck.filter(item=>item!==card.nombre);state.enemyDeck=state.enemyDeck.filter(item=>item!==card.nombre);
+          persistStateOrThrow("Carta eliminada");renderCards();renderDecks();
+          if(card.imageId)mediaDB.delete(card.imageId).catch(error=>console.warn("La imagen eliminada quedó huérfana",error));
+        }catch(error){restorePersistentState(snapshot);markSaveStatus("No guardado",true);toast(STORAGE.describeStorageError?.(error)||error?.message||"No se pudo eliminar la carta.","error");}
       }
     });
     $("#resetCardsButton").addEventListener("click",async()=>{
       if(!confirmAction("Se restaurarán las 100 cartas iniciales. Las imágenes asignadas a cartas se eliminarán."))return;
-      const ids=state.cards.map(c=>c.imageId).filter(Boolean);for(const id of ids)await mediaDB.delete(id);
-      state.cards=migrateCardsToTap(clone(INITIAL.cards));state.decks={...clone(INITIAL.starterDecks),...state.decks};state.playerDeck=clone(INITIAL.starterDecks["Inicial Fácil"]);state.enemyDeck=clone(INITIAL.starterDecks["Inicial Medio"]);rerollEnchantments(false);saveState();renderCards();renderDecks();toast("Cartas iniciales restauradas.");
+      const snapshot=snapshotPersistentState(),ids=state.cards.map(c=>c.imageId).filter(Boolean);
+      try{
+        state.cards=migrateCardsToTap(clone(INITIAL.cards));state.decks={...clone(INITIAL.starterDecks),...state.decks};state.playerDeck=clone(INITIAL.starterDecks["Inicial Fácil"]);state.enemyDeck=clone(INITIAL.starterDecks["Inicial Medio"]);rerollEnchantments(false);
+        persistStateOrThrow("Cartas restauradas");renderCards();renderDecks();toast("Cartas iniciales restauradas.");
+        mediaDB.deleteMany(ids).catch(error=>console.warn("No se pudieron limpiar todas las imágenes anteriores",error));
+      }catch(error){restorePersistentState(snapshot);markSaveStatus("No guardado",true);toast(STORAGE.describeStorageError?.(error)||error?.message||"No se pudieron restaurar las cartas.","error");}
     });
 
     // El formulario usa botones controlados: guardar y cancelar no dependen de method="dialog" ni de la validación nativa.
@@ -1230,7 +1195,11 @@
     $("#backgroundBlur").addEventListener("input",event=>{state.settings.backgroundBlur=Number(event.target.value);applyMediaSettings();saveState();});
     $("#backgroundImageInput").addEventListener("change",event=>{const file=event.target.files[0];event.target.value="";attachBackground(file);});
     $("#backgroundVideoInput").addEventListener("change",event=>{const file=event.target.files[0];event.target.value="";attachBackground(file);});
-    $("#removeBackgroundButton").addEventListener("click",async()=>{if(state.settings.backgroundId)await mediaDB.delete(state.settings.backgroundId);state.settings.backgroundId=null;state.settings.backgroundType="";state.settings.backgroundName="";saveState();applyMediaSettings();});
+    $("#removeBackgroundButton").addEventListener("click",async()=>{
+      const old=state.settings.backgroundId,snapshot=snapshotPersistentState();
+      try{state.settings.backgroundId=null;state.settings.backgroundType="";state.settings.backgroundName="";persistStateOrThrow("Fondo eliminado");await applyMediaSettings();if(old)mediaDB.delete(old).catch(error=>console.warn("El fondo eliminado quedó huérfano",error));}
+      catch(error){restorePersistentState(snapshot);markSaveStatus("No guardado",true);toast(STORAGE.describeStorageError?.(error)||error?.message||"No se pudo eliminar el fondo.","error");}
+    });
     $("#musicInput").addEventListener("change",event=>{const files=[...event.target.files];event.target.value="";attachMusic(files);});
     $("#musicRandomToggle").addEventListener("change",event=>{state.settings.musicRandom=event.target.checked;state.settings.musicEnabled=true;saveState();renderMusicOptions();});
     $("#musicLibrarySelect").addEventListener("change",event=>{state.settings.selectedMusicId=event.target.value;state.settings.musicRandom=false;state.settings.musicEnabled=true;saveState();renderMusicOptions();});
@@ -1238,8 +1207,17 @@
     $("#removeMusicButton").addEventListener("click",async()=>{const id=$("#musicLibrarySelect").value;if(state.settings.musicTracks.some(track=>track.id===id))await removeMusicTrack(id);else toast("No hay una pista importada seleccionada.","error");});
 
     $("#exportBackupButton").addEventListener("click",exportBackup);$("#importBackupInput").addEventListener("change",event=>{const file=event.target.files[0];event.target.value="";importBackup(file);});
-    $("#resetEverythingButton").addEventListener("click",async()=>{if(!confirmAction("Se borrarán cartas, decks, multimedia y ajustes locales. ¿Continuar?"))return;localStorage.removeItem(STORAGE_KEY);await mediaDB.clear();location.reload();});
-    $("#clearMediaButton").addEventListener("click",async()=>{if(!confirmAction("Se borrarán todas las imágenes, el fondo y el audio local."))return;await mediaDB.clear();state.cards.forEach(card=>card.imageId=null);state.settings.backgroundId=null;state.settings.backgroundType="";state.settings.backgroundName="";state.settings.musicId=null;state.settings.musicName="";state.settings.musicTracks=[];state.settings.selectedMusicId="";state.settings.lastMusicId=null;state.settings.musicEnabled=false;saveState();renderCards();renderMusicOptions();applyMediaSettings();toast("Multimedia local eliminada.");});
+    $("#resetEverythingButton").addEventListener("click",async()=>{if(!confirmAction("Se borrarán cartas, decks, multimedia y ajustes locales. ¿Continuar?"))return;stateStore.remove();await mediaDB.clear().catch(error=>console.warn("No se pudo limpiar toda la multimedia",error));location.reload();});
+    $("#clearMediaButton").addEventListener("click",async()=>{
+      if(!confirmAction("Se borrarán todas las imágenes, el fondo y el audio local."))return;
+      const snapshot=snapshotPersistentState();
+      try{
+        state.cards.forEach(card=>card.imageId=null);state.settings.backgroundId=null;state.settings.backgroundType="";state.settings.backgroundName="";state.settings.musicId=null;state.settings.musicName="";state.settings.musicTracks=[];state.settings.selectedMusicId="";state.settings.lastMusicId=null;state.settings.musicEnabled=false;
+        persistStateOrThrow("Multimedia eliminada");
+      }catch(error){restorePersistentState(snapshot);markSaveStatus("No guardado",true);toast(STORAGE.describeStorageError?.(error)||error?.message||"No se pudo guardar el cambio.","error");return;}
+      await mediaDB.clear().catch(error=>console.warn("El estado ya fue limpiado, pero algunos blobs pudieron quedar huérfanos",error));
+      renderCards();renderMusicOptions();await applyMediaSettings();toast("Multimedia local eliminada.");
+    });
   }
 
   function buildEditorButtonPad(){
@@ -1248,7 +1226,7 @@
   }
 
   async function init(){
-    await mediaDB.open();loadState();state.playerDeck=sanitizeDeck(state.playerDeck);state.enemyDeck=sanitizeDeck(state.enemyDeck);ensureEnchantments();
+    await mediaDB.open();loadState();await reconcileMediaState();state.playerDeck=sanitizeDeck(state.playerDeck);state.enemyDeck=sanitizeDeck(state.enemyDeck);ensureEnchantments();
     applyLayoutMode();buildEditorButtonPad();bindEvents();combatRenderer=COMBAT_VISUALS.getRenderer($("#combatAnimationCanvas"));updateHomeStats();renderCards();renderEmblems();renderDecks();await applyMediaSettings();updateBattleHealth();setBattleView("battleIdle");setControllerEnabled(false);
     go(location.hash.slice(1)||"home");
   }
