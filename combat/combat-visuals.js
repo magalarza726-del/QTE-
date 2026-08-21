@@ -55,8 +55,8 @@
     }
     idleFrame(time=performance.now()/1000){this.activePose.player=Anim.basePose();this.activePose.enemy=Anim.basePose();this.drawScene(time,1/60);}
     async wait(seconds,token){
-      if(!(seconds>0))return;const start=performance.now();
-      await new Promise(resolve=>{const frame=now=>{if(token!==this.runToken){resolve();return;}this.drawScene(now/1000,1/60);if((now-start)/1000>=seconds){resolve();return;}this.raf=requestAnimationFrame(frame);};this.raf=requestAnimationFrame(frame);});
+      if(!(seconds>0))return;const start=performance.now();let last=start;
+      await new Promise(resolve=>{const frame=now=>{if(token!==this.runToken){resolve();return;}const dt=Math.min(.04,Math.max(0,(now-last)/1000)||1/60);last=now;this.drawScene(now/1000,dt);if((now-start)/1000>=seconds){resolve();return;}this.raf=requestAnimationFrame(frame);};this.raf=requestAnimationFrame(frame);});
     }
     projectilePoint(descriptor,t,actor,target,anchors){
       let travel=clamp((t-.28)/.58);if(descriptor.returnProjectile)travel=travel<.5?travel*2:(1-travel)*2;
@@ -71,7 +71,7 @@
         const frame=now=>{
           if(token!==this.runToken){resolve();return;}
           const elapsed=(now-start)/1000,t=clamp(elapsed/duration),dt=Math.min(.04,(now-last)/1000||1/60);last=now;
-          const pose=descriptor.sample(t,config);this.activePose[side]=pose;this.activePose[other]={...this.idlePose,x:target.recoil};
+          const pose=descriptor.sample(t,config);this.activePose[side]=pose;this.activePose[other]={...this.idlePose};
           const anchors=actor.anchors(pose),trailAnchor=anchors[descriptor.trailPart]||anchors.frontHand;trailAccumulator+=dt;
           if(trailAccumulator>=1/60){trailAccumulator=0;this.effects.addTrail(trailAnchor,profile,config,this.visualFor(side,elapsed).extremityColor);}
           if(descriptor.projectile&&t>.25&&t<.9){
@@ -92,12 +92,12 @@
       const runtime=execution.runtime||{},card=runtime.card||execution.card||{},sequence=Anim.sequenceOf(card.animation||execution.card?.animation||{});
       this.activeRuntime[side]=runtime;const other=side==="player"?"enemy":"player";if(!this.activeRuntime[other])this.activeRuntime[other]={emblemId:null,emblem:null};
       for(let index=0;index<sequence.length&&token===this.runToken;index++){
-        const step=sequence[index];onStep?.(step,index,sequence.length);await this.playSingleStep(execution,side,step.animation,token);await this.wait(step.pauseAfter,token);
+        const step=sequence[index];onStep?.(step,index,sequence.length);await this.playSingleStep(execution,side,step.animation,token);const pauseScale=this.preview?PREVIEW_DURATION_SCALE:COMBAT_DURATION_SCALE;await this.wait(step.pauseAfter*pauseScale,token);
       }
       if(token===this.runToken){this.running=false;this.activePose[side]=Anim.basePose();this.idleFrame();}
     }
     async playTurn({playerExecutions=[],enemyExecutions=[]}={}){for(const execution of playerExecutions)await this.playExecution(execution,"player");for(const execution of enemyExecutions)await this.playExecution(execution,"enemy");}
-    stop(){this.running=false;this.runToken++;cancelAnimationFrame(this.raf);this.effects.clear();this.activePose.player=Anim.basePose();this.activePose.enemy=Anim.basePose();}
+    stop(){this.running=false;this.runToken++;cancelAnimationFrame(this.raf);this.effects.clear();this.camera.reset();this.player.recoil=0;this.enemy.recoil=0;this.activePose.player=Anim.basePose();this.activePose.enemy=Anim.basePose();}
   }
 
   const instances=new WeakMap();
