@@ -1,0 +1,46 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.maverick.qte'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.maverick.qte'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '10.2.0-offline.1'
+    }
+    buildTypes { release { minifyEnabled false } }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+    buildFeatures { buildConfig true }
+    sourceSets { main { assets.srcDir layout.buildDirectory.dir('generated/qte-assets') } }
+}
+
+def sourceWebsite = rootProject.projectDir.parentFile
+tasks.register('copyQteWebAssets', Sync) {
+    description = 'Empaqueta la web original localmente dentro del APK'
+    from(sourceWebsite) {
+        include 'index.html', '*.js', '*.css'
+        include 'animation/**', 'audio/**', 'camera/**', 'characters/**'
+        include 'combat/**', 'core/**', 'effects/**', 'emblems/**'
+        include 'particles/**', 'storage/**'
+    }
+    into(layout.buildDirectory.dir('generated/qte-assets/www'))
+    doFirst {
+        if (!new File(sourceWebsite, 'index.html').exists())
+            throw new GradleException('No se encontró ../index.html. Abre android/ desde el repositorio QTE completo.')
+    }
+}
+tasks.matching { it.name.startsWith('merge') && it.name.endsWith('Assets') }
+    .configureEach { dependsOn(tasks.named('copyQteWebAssets')) }
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+}
