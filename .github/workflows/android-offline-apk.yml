@@ -50,10 +50,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Install Android SDK 35 using runner SDK
-        run: |
-          command -v sdkmanager
-          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Android SDK tools
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+      - name: Install Android SDK 35
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - name: Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
