@@ -16,6 +16,7 @@ import ec.qtelab.mobile.data.PersistentState
 import ec.qtelab.mobile.data.QteCard
 import ec.qtelab.mobile.domain.BalanceRules
 import ec.qtelab.mobile.domain.EmblemCatalog
+import ec.qtelab.mobile.ui.components.CardArt
 import ec.qtelab.mobile.ui.components.CombatStage
 import ec.qtelab.mobile.ui.components.QteButtonPad
 import ec.qtelab.mobile.ui.components.StatPill
@@ -82,7 +83,19 @@ private fun QtePanel(state: PersistentState,b:BattleUiState,vm:QteViewModel,comp
     val emblem=EmblemCatalog.get(b.executionEmblemId)
     Surface(modifier,shape=RoundedCornerShape(24.dp),tonalElevation=3.dp) {
         Column(Modifier.fillMaxSize().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (card != null) {
+                    CardArt(
+                        cardId = card.id,
+                        file = vm.mediaFile(card.imageId),
+                        tintColor = emblem?.let { Color(it.colorHex) },
+                        modifier = Modifier.width(78.dp).height(42.dp)
+                    )
+                }
                 Column(Modifier.weight(1f)) {
                     Text(card?.name ?: if(b.qteActive) "QTE" else "Elige una carta",fontWeight=FontWeight.Black,style=MaterialTheme.typography.titleMedium)
                     if(emblem!=null) Text(emblem.icon+" "+emblem.name,color=Color(emblem.colorHex),style=MaterialTheme.typography.labelMedium)
