@@ -3,6 +3,7 @@ package ec.qtelab.mobile.data
 import android.content.Context
 import android.net.Uri
 import ec.qtelab.mobile.domain.EmblemDistributor
+import ec.qtelab.mobile.domain.DeckRules
 import ec.qtelab.mobile.domain.QteFormulas
 import org.json.JSONObject
 import java.io.File
@@ -73,8 +74,19 @@ class QteRepository(private val context: Context) {
                 put(name, ids)
             }
         }
-        val player = decks["Inicial Fácil"].orEmpty().take(12)
-        val enemy = decks["Inicial Medio"].orEmpty().take(12)
+        fun starterDeck(name: String): List<String> {
+            val selected = decks[name].orEmpty().take(DeckRules.MAX_CARDS).toMutableList()
+            if (selected.size < DeckRules.MIN_CARDS) {
+                base.cards.asSequence()
+                    .map { it.id }
+                    .filterNot(selected::contains)
+                    .take(DeckRules.MIN_CARDS - selected.size)
+                    .forEach(selected::add)
+            }
+            return selected
+        }
+        val player = starterDeck("Inicial Fácil")
+        val enemy = starterDeck("Inicial Medio")
         val settings = AppSettings()
         return PersistentState(
             cards = base.cards,
@@ -92,7 +104,7 @@ class QteRepository(private val context: Context) {
     private fun sanitize(state: PersistentState): PersistentState {
         val cards = state.cards.map(QteFormulas::refresh)
         val ids = cards.mapTo(hashSetOf()) { it.id }
-        fun deck(list: List<String>) = list.filter(ids::contains).distinct().take(12)
+        fun deck(list: List<String>) = list.filter(ids::contains).distinct().take(DeckRules.MAX_CARDS)
         val decks = state.decks.mapValues { deck(it.value) }
         return state.copy(
             cards = cards,
