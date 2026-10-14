@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package ec.qtelab.mobile.ui
 
 import android.content.res.Configuration
