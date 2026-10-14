@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ec.qtelab.mobile.data.PersistentState
+import ec.qtelab.mobile.domain.DeckRules
 import ec.qtelab.mobile.ui.components.CardTile
 import ec.qtelab.mobile.ui.components.SectionTitle
 import ec.qtelab.mobile.viewmodel.DeckSide
@@ -22,35 +23,105 @@ fun DecksScreen(state: PersistentState, vm: QteViewModel) {
     var presetExpanded by remember { mutableStateOf(false) }
     var saveName by remember { mutableStateOf("") }
     val deck = if (side == DeckSide.PLAYER) state.playerDeck else state.enemyDeck
+    val playerReady = DeckRules.isValid(state.playerDeck.size)
+    val enemyReady = DeckRules.isValid(state.enemyDeck.size)
+    val bothReady = playerReady && enemyReady
 
-    Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionTitle("CONSTRUCCIÓN", "Decks de combate", "Cada lado usa exactamente 12 cartas. Toca una carta para añadirla o retirarla.")
+    Column(
+        Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        SectionTitle(
+            "PASO 2 DE 2",
+            "Decks de combate",
+            "Cada lado debe tener entre " + DeckRules.MIN_CARDS + " y " + DeckRules.MAX_CARDS + " cartas. Toca una carta para añadirla o retirarla."
+        )
+
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = side == DeckSide.PLAYER, onClick = { side = DeckSide.PLAYER }, label = { Text("Tu deck " + state.playerDeck.size + "/12") })
-            FilterChip(selected = side == DeckSide.ENEMY, onClick = { side = DeckSide.ENEMY }, label = { Text("Rival " + state.enemyDeck.size + "/12") })
+            FilterChip(
+                selected = side == DeckSide.PLAYER,
+                onClick = { side = DeckSide.PLAYER },
+                label = { Text("Tu deck " + state.playerDeck.size + "/" + DeckRules.MAX_CARDS) },
+                modifier = Modifier.weight(1f)
+            )
+            FilterChip(
+                selected = side == DeckSide.ENEMY,
+                onClick = { side = DeckSide.ENEMY },
+                label = { Text("Rival " + state.enemyDeck.size + "/" + DeckRules.MAX_CARDS) },
+                modifier = Modifier.weight(1f)
+            )
         }
+
         Surface(shape = RoundedCornerShape(20.dp), tonalElevation = 2.dp) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box {
-                        OutlinedButton(onClick = { presetExpanded = true }) { Text("Cargar preset") }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { presetExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Cargar preset") }
                         DropdownMenu(expanded = presetExpanded, onDismissRequest = { presetExpanded = false }) {
                             state.decks.keys.sorted().forEach { name ->
-                                DropdownMenuItem(text = { Text(name) }, onClick = {
-                                    vm.loadDeck(name, side); presetExpanded = false
-                                })
+                                DropdownMenuItem(
+                                    text = { Text(name, maxLines = 1) },
+                                    onClick = {
+                                        vm.loadDeck(name, side)
+                                        presetExpanded = false
+                                    }
+                                )
                             }
                         }
                     }
-                    OutlinedTextField(
-                        value = saveName, onValueChange = { saveName = it },
-                        label = { Text("Nombre") }, singleLine = true, modifier = Modifier.weight(1f)
+                    AssistChip(
+                        onClick = {},
+                        label = { Text(deck.size.toString() + "/" + DeckRules.MAX_CARDS) }
                     )
-                    Button(onClick = { vm.saveCurrentDeck(saveName, side); saveName = "" }, enabled = deck.isNotEmpty()) { Text("Guardar") }
                 }
-                Text("Seleccionadas: " + deck.size + "/12", fontWeight = FontWeight.Bold, color = if (deck.size == 12) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+
+                OutlinedTextField(
+                    value = saveName,
+                    onValueChange = { saveName = it },
+                    label = { Text("Nombre del deck") },
+                    placeholder = { Text("Ej. Mi deck Sombra") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Button(
+                    onClick = {
+                        vm.saveCurrentDeck(saveName, side)
+                        if (saveName.isNotBlank() && DeckRules.isValid(deck.size)) saveName = ""
+                    },
+                    enabled = DeckRules.isValid(deck.size),
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Guardar deck") }
+
+                val ready = DeckRules.isValid(deck.size)
+                Text(
+                    if (ready) {
+                        "Listo: " + deck.size + " cartas"
+                    } else if (deck.size < DeckRules.MIN_CARDS) {
+                        "Faltan " + (DeckRules.MIN_CARDS - deck.size) + " carta(s) para el mínimo."
+                    } else {
+                        "Máximo alcanzado."
+                    },
+                    fontWeight = FontWeight.Bold,
+                    color = if (ready) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
+
+        Button(
+            onClick = vm::startBattle,
+            enabled = bothReady,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                if (bothReady) "Iniciar batalla"
+                else "Completa ambos decks (" + DeckRules.MIN_CARDS + "–" + DeckRules.MAX_CARDS + ")"
+            )
+        }
+
         LazyVerticalGrid(
             columns = GridCells.Adaptive(170.dp),
             modifier = Modifier.weight(1f),
