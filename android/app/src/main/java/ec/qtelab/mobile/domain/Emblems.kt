@@ -29,8 +29,8 @@ object EmblemCatalog {
     val all = listOf(
         EmblemDefinition(
             "shadow", "Clan Sombra", "◒", 0xFF6C3A9BL,
-            "La secuencia desaparece y un perfecto habilita una carta adicional al 65 %.",
-            hideSequenceAfterSeconds = 0.75, extraCardOnPerfect = true, extraCardMultiplier = 0.65
+            "Previsualiza la secuencia 3 s, luego la oculta. Un perfecto habilita una carta adicional al 65 %.",
+            hideSequenceAfterSeconds = 3.0, extraCardOnPerfect = true, extraCardMultiplier = 0.65
         ),
         EmblemDefinition(
             "assassin", "Clan Asesino", "✦", 0xFFFF1744L,
