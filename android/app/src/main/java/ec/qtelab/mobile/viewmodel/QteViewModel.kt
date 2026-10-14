@@ -243,6 +243,11 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleDeckCard(side: DeckSide, cardId: String) {
+        val currentNow = if (side == DeckSide.PLAYER) _ui.value.persistent.playerDeck else _ui.value.persistent.enemyDeck
+        if (cardId !in currentNow && currentNow.size >= DeckRules.MAX_CARDS) {
+            toast("Máximo " + DeckRules.MAX_CARDS + " cartas por deck.")
+            return
+        }
         updatePersistent { state ->
             val current = if (side == DeckSide.PLAYER) state.playerDeck else state.enemyDeck
             val next = if (cardId in current) current - cardId else if (current.size < DeckRules.MAX_CARDS) current + cardId else current
