@@ -58,7 +58,7 @@ fun CardArt(
     val bundledBitmap = if (importedBitmap == null) rememberBaseCardArt(cardId) else null
     val image = importedBitmap?.asImageBitmap() ?: bundledBitmap
     val clanFilter = tintColor?.let {
-        ColorFilter.tint(it.copy(alpha = 0.42f), BlendMode.SrcAtop)
+        ColorFilter.tint(it.copy(alpha = 0.56f), BlendMode.Color)
     }
 
     Box(
