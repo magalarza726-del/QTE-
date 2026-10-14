@@ -82,7 +82,7 @@ fun QteApp(viewModel: QteViewModel = viewModel()) {
                 title = {
                     Column {
                         Text("QTE Lab", style = MaterialTheme.typography.titleLarge)
-                        Text("Android · v0.2", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Text("Android · v0.3", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
                 },
                 actions = {
@@ -134,7 +134,7 @@ fun QteApp(viewModel: QteViewModel = viewModel()) {
             }
             Box(Modifier.weight(1f).fillMaxHeight()) {
                 when (ui.screen) {
-                    AppScreen.HOME -> HomeScreen(ui.persistent, onCards = { viewModel.navigate(AppScreen.CARDS) }, onBattle = { viewModel.startBattle() })
+                    AppScreen.HOME -> HomeScreen(ui.persistent, onCards = { viewModel.navigate(AppScreen.CARDS) }, onBattle = viewModel::beginPreparation)
                     AppScreen.CARDS -> CardsScreen(ui.persistent, viewModel)
                     AppScreen.EMBLEMS -> EmblemsScreen(ui.persistent, viewModel)
                     AppScreen.DECKS -> DecksScreen(ui.persistent, viewModel)
