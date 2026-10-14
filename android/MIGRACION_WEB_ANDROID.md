@@ -1,8 +1,8 @@
-# Migración Web ↔ Android
+# Migración QTE Lab Web ↔ Android
 
-El objetivo es que QTE Lab web y Android compartan conceptos y, progresivamente, el mismo backup.
+La versión Android conserva el modelo conceptual de QTE Lab web para que cartas, decks y configuración puedan viajar mediante JSON.
 
-## Campos conservados
+## Estado compartido
 
 - `cards`
 - `decks`
@@ -16,16 +16,24 @@ El objetivo es que QTE Lab web y Android compartan conceptos y, progresivamente,
 - `estadisticas`
 - `animation`
 
-El decoder Android acepta animaciones individuales y secuencias donde cada paso tenga los parámetros directamente o dentro de `animation`, como en la web v10.x.
+El decoder Android acepta técnicas individuales y secuencias donde cada paso contiene sus parámetros directamente o dentro de `animation`, como en la rama web v10.x.
+
+## Datos iniciales en el monorepo
+
+Para evitar mantener dos copias de las 100 cartas, el proyecto Android genera `initial_data.json` desde el `data.js` de la raíz durante `preBuild` cuando el asset no está incluido. El ZIP independiente de Android sí puede llevar el asset integrado.
 
 ## Multimedia
 
-La web usa IndexedDB; Android copia los archivos al almacenamiento privado de la app. En el backup ambos se pueden representar mediante `dataUrl` Base64.
+La web persiste multimedia con IndexedDB. Android la copia al almacenamiento privado de la aplicación. En un respaldo portable ambos formatos pueden transportar archivos mediante `dataUrl` Base64.
 
-## Próximos pasos de compatibilidad
+Android v0.2 ya contempla:
 
-- Biblioteca de música Android.
-- Fondo de batalla imagen/video.
-- Biblioteca de animaciones personalizadas.
-- Renderer procedural completo.
-- Importación selectiva (solo cartas / solo decks / configuración completa).
+- imágenes de cartas;
+- fondo de batalla local;
+- música importada por el usuario;
+- hasta 20 pistas;
+- selección aleatoria por combate.
+
+## Compatibilidad futura
+
+Las siguientes etapas pueden ampliar la importación selectiva y el renderer procedural sin cambiar el esquema base de cartas, decks, emblemas y secuencias.
