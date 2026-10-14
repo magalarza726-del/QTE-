@@ -82,6 +82,8 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun navigate(screen: AppScreen) { _ui.value = _ui.value.copy(screen = screen) }
+    fun beginPreparation() { navigate(AppScreen.EMBLEMS) }
+    fun continueToDecks() { navigate(AppScreen.DECKS) }
     fun consumeToast() { _ui.value = _ui.value.copy(toast = null) }
     private fun toast(text: String) { _ui.value = _ui.value.copy(toast = text) }
 
@@ -243,7 +245,7 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleDeckCard(side: DeckSide, cardId: String) {
         updatePersistent { state ->
             val current = if (side == DeckSide.PLAYER) state.playerDeck else state.enemyDeck
-            val next = if (cardId in current) current - cardId else if (current.size < 12) current + cardId else current
+            val next = if (cardId in current) current - cardId else if (current.size < DeckRules.MAX_CARDS) current + cardId else current
             if (side == DeckSide.PLAYER) {
                 state.copy(
                     playerDeck = next,
@@ -259,7 +261,7 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadDeck(name: String, side: DeckSide) {
-        val deck = _ui.value.persistent.decks[name].orEmpty().take(12)
+        val deck = _ui.value.persistent.decks[name].orEmpty().take(DeckRules.MAX_CARDS)
         updatePersistent { state ->
             if (side == DeckSide.PLAYER) {
                 state.copy(
@@ -277,9 +279,16 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
 
     fun saveCurrentDeck(name: String, side: DeckSide) {
         val trimmed = name.trim()
-        if (trimmed.isBlank()) return
+        if (trimmed.isBlank()) {
+            toast("Escribe un nombre para el deck.")
+            return
+        }
+        val ids = if (side == DeckSide.PLAYER) _ui.value.persistent.playerDeck else _ui.value.persistent.enemyDeck
+        if (!DeckRules.isValid(ids.size)) {
+            toast("El deck debe tener entre ${DeckRules.MIN_CARDS} y ${DeckRules.MAX_CARDS} cartas.")
+            return
+        }
         updatePersistent { state ->
-            val ids = if (side == DeckSide.PLAYER) state.playerDeck else state.enemyDeck
             state.copy(decks = state.decks + (trimmed to ids))
         }
         toast("Deck guardado")
@@ -287,15 +296,20 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startBattle() {
         val p = _ui.value.persistent
-        if (p.playerDeck.size != 12 || p.enemyDeck.size != 12) {
-            toast("Cada deck debe contener exactamente 12 cartas.")
+        if (!DeckRules.isValid(p.playerDeck.size) || !DeckRules.isValid(p.enemyDeck.size)) {
+            toast("Cada deck debe tener entre ${DeckRules.MIN_CARDS} y ${DeckRules.MAX_CARDS} cartas.")
             navigate(AppScreen.DECKS)
             return
         }
-        val pManifest = p.enchantments.player.takeIf { it.size == 12 }
-            ?: EmblemDistributor.distribute(p.settings.playerEmblems, 12)
-        val eManifest = p.enchantments.enemy.takeIf { it.size == 12 }
-            ?: EmblemDistributor.distribute(p.settings.enemyEmblems, 12)
+        if (p.settings.playerEmblems.isEmpty() || p.settings.enemyEmblems.isEmpty()) {
+            toast("Selecciona al menos un emblema para cada lado.")
+            navigate(AppScreen.EMBLEMS)
+            return
+        }
+        val pManifest = p.enchantments.player.takeIf { it.size == p.playerDeck.size }
+            ?: EmblemDistributor.distribute(p.settings.playerEmblems, p.playerDeck.size)
+        val eManifest = p.enchantments.enemy.takeIf { it.size == p.enemyDeck.size }
+            ?: EmblemDistributor.distribute(p.settings.enemyEmblems, p.enemyDeck.size)
         val playerEmblems = p.playerDeck.mapIndexedNotNull { i, id -> pManifest[i]?.let { id to it } }.toMap()
         val enemyEmblems = p.enemyDeck.mapIndexedNotNull { i, id -> eManifest[i]?.let { id to it } }.toMap()
         val pDeck = p.playerDeck.shuffled()
@@ -317,8 +331,8 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
             screen = AppScreen.BATTLE,
             battle = BattleUiState(
                 active = true,
-                playerHand = pDeck.take(3), enemyHand = eDeck.take(3),
-                playerDrawPile = pDeck.drop(3), enemyDrawPile = eDeck.drop(3),
+                playerHand = pDeck.take(DeckRules.HAND_SIZE), enemyHand = eDeck.take(DeckRules.HAND_SIZE),
+                playerDrawPile = pDeck.drop(DeckRules.HAND_SIZE), enemyDrawPile = eDeck.drop(DeckRules.HAND_SIZE),
                 playerEmblems = playerEmblems, enemyEmblems = enemyEmblems,
                 battleMusicId = musicId,
                 message = "Elige una carta para ejecutar su QTE."
