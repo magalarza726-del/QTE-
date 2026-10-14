@@ -22,11 +22,14 @@ fun EmblemsScreen(state: PersistentState, vm: QteViewModel) {
     LazyColumn(
         Modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item { SectionTitle("ESTRATEGIA", "Emblemas", "Equipa entre 1 y 4 por lado. Las 12 cartas se reparten aleatoriamente sin repetir posición.") }
+        item { SectionTitle("PASO 1 DE 2", "Selecciona los clanes", "Equipa entre 1 y 4 emblemas por lado. Todas las cartas del deck se reparten aleatoriamente sin repetir posición.") }
         item { EmblemSide("Jugador", state.settings.playerEmblems, DeckSide.PLAYER, vm) }
         item { EmblemSide("Rival", state.settings.enemyEmblems, DeckSide.ENEMY, vm) }
         item {
-            Button(onClick = vm::randomizeEnchantments, modifier = Modifier.fillMaxWidth()) { Text("Volver a sortear encantamientos") }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = vm::randomizeEnchantments, modifier = Modifier.weight(1f)) { Text("Volver a sortear") }
+                Button(onClick = vm::continueToDecks, modifier = Modifier.weight(1f)) { Text("Continuar a decks") }
+            }
         }
         item {
             Surface(shape = RoundedCornerShape(22.dp), tonalElevation = 2.dp) {
