@@ -14,7 +14,6 @@ android {
         targetSdk = 35
         versionCode = 2
         versionName = "0.2.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -37,13 +36,34 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    kotlinOptions { jvmTarget = "17" }
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
+}
+
+// En el monorepo no duplicamos las ~100 cartas: si el asset no existe,
+// Gradle lo genera desde el data.js que también usa GitHub Pages.
+val checkedInInitialData = file("src/main/assets/initial_data.json")
+val repositoryDataJs = rootProject.file("../data.js")
+if (!checkedInInitialData.exists() && repositoryDataJs.exists()) {
+    val generatedAssetsDir = layout.buildDirectory.dir("generated/qteAssets")
+    android.sourceSets.getByName("main").assets.srcDir(generatedAssetsDir)
+    val generateInitialData by tasks.registering {
+        inputs.file(repositoryDataJs)
+        outputs.file(generatedAssetsDir.map { it.file("initial_data.json") })
+        doLast {
+            val marker = "window.QTE_INITIAL_DATA = "
+            val source = repositoryDataJs.readText()
+            require(marker in source) { "No se encontró QTE_INITIAL_DATA en ../data.js" }
+            val json = source.substringAfter(marker).trim().removeSuffix(";")
+            val output = generatedAssetsDir.get().file("initial_data.json").asFile
+            output.parentFile.mkdirs()
+            output.writeText(json)
+        }
+    }
+    tasks.named("preBuild").configure { dependsOn(generateInitialData) }
 }
 
 dependencies {
