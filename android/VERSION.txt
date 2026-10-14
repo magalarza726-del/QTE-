@@ -1,3 +1,3 @@
-QTE Lab Android v0.3.0
+QTE Lab Android v0.4.0
 Native Kotlin + Jetpack Compose
-Offline runtime · preparation flow · decks 15–20 · JSON import/export · GitHub Actions APK
+Offline runtime · 100 bundled card artworks · clan image filters · decks 15–20 · JSON import/export · GitHub Actions APK
