@@ -106,7 +106,7 @@ data class EnchantmentManifest(
 )
 
 data class PersistentState(
-    val schemaVersion: Int = 2,
+    val schemaVersion: Int = 3,
     val cards: List<QteCard> = emptyList(),
     val decks: Map<String, List<String>> = emptyMap(),
     val playerDeck: List<String> = emptyList(),
