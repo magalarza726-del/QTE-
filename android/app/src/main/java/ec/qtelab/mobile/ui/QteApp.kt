@@ -78,31 +78,33 @@ fun QteApp(viewModel: QteViewModel = viewModel()) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("QTE Lab", style = MaterialTheme.typography.titleLarge)
-                        Text("Android · v0.4", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    }
-                },
-                actions = {
-                    if (!wide) {
-                        Box {
-                            IconButton(onClick = { overflowOpen = true }) { Icon(Icons.Default.MoreVert, "Más opciones") }
-                            DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
-                                secondaryNavItems.forEach { item ->
-                                    DropdownMenuItem(
-                                        text = { Text(item.label) },
-                                        leadingIcon = { Icon(item.icon, null) },
-                                        onClick = { overflowOpen = false; viewModel.navigate(item.screen) }
-                                    )
+            if (ui.screen != AppScreen.BATTLE) {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text("QTE Lab", style = MaterialTheme.typography.titleLarge)
+                            Text("Android · v0.5", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        }
+                    },
+                    actions = {
+                        if (!wide) {
+                            Box {
+                                IconButton(onClick = { overflowOpen = true }) { Icon(Icons.Default.MoreVert, "Más opciones") }
+                                DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
+                                    secondaryNavItems.forEach { item ->
+                                        DropdownMenuItem(
+                                            text = { Text(item.label) },
+                                            leadingIcon = { Icon(item.icon, null) },
+                                            onClick = { overflowOpen = false; viewModel.navigate(item.screen) }
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                )
+            }
         },
         bottomBar = {
             if (!wide) NavigationBar {
