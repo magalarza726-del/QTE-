@@ -28,7 +28,7 @@ class QteRepository(private val context: Context) {
 
     fun exportBackup(state: PersistentState): String = JSONObject().apply {
         put("app", "QTE Lab")
-        put("version", "android-0.4.0")
+        put("version", "android-0.5.0")
         put("exportedAt", java.time.Instant.now().toString())
         put("state", JsonCodec.encodeState(sanitize(state)))
         put("media", media.exportMedia())
