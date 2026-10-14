@@ -35,7 +35,7 @@ fun HomeScreen(state: PersistentState, onCards: () -> Unit, onBattle: () -> Unit
                     Text("El QTE representa tu habilidad mecánica; los decks y emblemas aportan la estrategia.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Button(onClick = onCards) { Icon(Icons.Default.Style, null); Spacer(Modifier.width(6.dp)); Text("Crear cartas") }
-                        FilledTonalButton(onClick = onBattle) { Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(6.dp)); Text("Combatir") }
+                        FilledTonalButton(onClick = onBattle) { Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(6.dp)); Text("Preparar combate") }
                     }
                 }
             }
@@ -43,8 +43,8 @@ fun HomeScreen(state: PersistentState, onCards: () -> Unit, onBattle: () -> Unit
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Metric("Cartas", state.cards.size.toString(), Modifier.weight(1f))
-                Metric("Deck jugador", state.playerDeck.size.toString() + "/12", Modifier.weight(1f))
-                Metric("Deck rival", state.enemyDeck.size.toString() + "/12", Modifier.weight(1f))
+                Metric("Deck jugador", state.playerDeck.size.toString() + "/15–20", Modifier.weight(1f))
+                Metric("Deck rival", state.enemyDeck.size.toString() + "/15–20", Modifier.weight(1f))
             }
         }
         item {
