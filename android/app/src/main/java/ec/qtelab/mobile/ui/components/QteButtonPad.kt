@@ -24,8 +24,8 @@ fun QteButtonPad(
     enabled: Boolean = true
 ) {
     val haptic = LocalHapticFeedback.current
-    val size = if (compact) 48.dp else 58.dp
-    val gap = if (compact) 5.dp else 8.dp
+    val size = if (compact) 44.dp else 58.dp
+    val gap = if (compact) 3.dp else 8.dp
     val press: (QteButton) -> Unit = {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         onPress(it)
@@ -75,7 +75,7 @@ private fun PadButton(button: QteButton, size: androidx.compose.ui.unit.Dp, enab
         onClick = { press(button) }, enabled = enabled,
         modifier = Modifier.size(size),
         contentPadding = PaddingValues(0.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(if (size <= 44.dp) 13.dp else 16.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
             contentColor = QteCyan
