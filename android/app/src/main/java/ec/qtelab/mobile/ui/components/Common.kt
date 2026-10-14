@@ -13,7 +13,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -44,16 +46,36 @@ fun StatPill(label: String, value: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun CardArt(file: File?, modifier: Modifier = Modifier) {
-    val bitmap = remember(file?.absolutePath, file?.lastModified()) {
+fun CardArt(
+    cardId: String,
+    file: File?,
+    tintColor: Color? = null,
+    modifier: Modifier = Modifier
+) {
+    val importedBitmap = remember(file?.absolutePath, file?.lastModified()) {
         file?.takeIf { it.exists() }?.let { BitmapFactory.decodeFile(it.absolutePath) }
     }
+    val bundledBitmap = if (importedBitmap == null) rememberBaseCardArt(cardId) else null
+    val image = importedBitmap?.asImageBitmap() ?: bundledBitmap
+    val clanFilter = tintColor?.let {
+        ColorFilter.tint(it.copy(alpha = 0.42f), BlendMode.SrcAtop)
+    }
+
     Box(
         modifier.clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        if (bitmap != null) Image(bitmap.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        else Text("QTE", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Black)
+        if (image != null) {
+            Image(
+                bitmap = image,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                colorFilter = clanFilter
+            )
+        } else {
+            Text("QTE", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Black)
+        }
     }
 }
 
@@ -74,7 +96,12 @@ fun CardTile(
     ) {
         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Box {
-                CardArt(imageFile, Modifier.fillMaxWidth().aspectRatio(1.55f))
+                CardArt(
+                    cardId = card.id,
+                    file = imageFile,
+                    tintColor = emblem?.let { Color(it.colorHex) },
+                    modifier = Modifier.fillMaxWidth().aspectRatio(2.1f)
+                )
                 if (emblem != null) {
                     Surface(
                         Modifier.align(Alignment.TopStart).padding(6.dp),
