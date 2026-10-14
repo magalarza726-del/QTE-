@@ -194,11 +194,11 @@ private fun DrawScope.drawTechniqueEffect(
                 style = Stroke(width = 7f)
             )
             drawLine(
-                Color.White.copy(alpha = .75f * alpha),
-                Offset(center.x - 34f, center.y + 24f),
-                Offset(center.x + 38f, center.y - 28f),
-                5f,
-                StrokeCap.Round
+                color = Color.White.copy(alpha = .75f * alpha),
+                start = Offset(center.x - 34f, center.y + 24f),
+                end = Offset(center.x + 38f, center.y - 28f),
+                strokeWidth = 5f,
+                cap = StrokeCap.Round
             )
         }
         else -> {
@@ -207,7 +207,13 @@ private fun DrawScope.drawTechniqueEffect(
                 start.x + (defender.x - attacker.x) * .30f,
                 start.y
             )
-            drawLine(color.copy(alpha = .45f * alpha), start, end, 5f, StrokeCap.Round)
+            drawLine(
+                color = color.copy(alpha = .45f * alpha),
+                start = start,
+                end = end,
+                strokeWidth = 5f,
+                cap = StrokeCap.Round
+            )
         }
     }
 }
