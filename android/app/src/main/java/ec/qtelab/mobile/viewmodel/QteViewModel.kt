@@ -38,7 +38,13 @@ data class BattleUiState(
     val executionCardId: String? = null,
     val executionEmblemId: String? = null,
     val qteActive: Boolean = false,
+    val previewActive: Boolean = false,
+    val previewRemaining: Double = 0.0,
     val sequenceVisible: Boolean = true,
+    val animationActive: Boolean = false,
+    val animationSide: String? = null,
+    val animationProgress: Float = 0f,
+    val animationType: String? = null,
     val sectionIndex: Int = 0,
     val buttonIndex: Int = 0,
     val expectedButton: QteButton? = null,
@@ -71,6 +77,9 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
 
     private var engine: QteEngine? = null
     private var ticker: Job? = null
+    private var previewJob: Job? = null
+    private var animationJob: Job? = null
+    private var resolvingTurn: Boolean = false
     private val usedPlayerCards = linkedSetOf<String>()
     private val usedEnemyCards = linkedSetOf<String>()
 
@@ -319,7 +328,12 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
         val enemyEmblems = p.enemyDeck.mapIndexedNotNull { i, id -> eManifest[i]?.let { id to it } }.toMap()
         val pDeck = p.playerDeck.shuffled()
         val eDeck = p.enemyDeck.shuffled()
-        usedPlayerCards.clear(); usedEnemyCards.clear(); engine = null; ticker?.cancel()
+        usedPlayerCards.clear(); usedEnemyCards.clear()
+        engine = null
+        ticker?.cancel(); ticker = null
+        previewJob?.cancel(); previewJob = null
+        animationJob?.cancel(); animationJob = null
+        resolvingTurn = false
         val availableTracks = p.settings.musicTracks.filter { repository.media.fileFor(it) != null }
         val musicId = if (availableTracks.isEmpty()) null else if (p.settings.randomMusic) {
             val candidates = availableTracks.filterNot { it == p.settings.lastMusicId }.ifEmpty { availableTracks }
@@ -349,31 +363,90 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
     fun chooseBattleCard(cardId: String) {
         val uiState = _ui.value
         val battle = uiState.battle
-        if (!battle.active || battle.qteActive || battle.winner != null || cardId !in battle.playerHand) return
+        if (!battle.active || battle.qteActive || battle.previewActive || battle.animationActive ||
+            battle.winner != null || cardId !in battle.playerHand) return
+
         val enemyChoice = battle.enemyHand.randomOrNull() ?: return
         val playerEmblem = battle.playerEmblems[cardId]
         val enemyEmblem = battle.enemyEmblems[enemyChoice]
-        val mirror = EmblemCatalog.get(playerEmblem)?.mirror == true || EmblemCatalog.get(enemyEmblem)?.mirror == true
+        val mirror = EmblemCatalog.get(playerEmblem)?.mirror == true ||
+            EmblemCatalog.get(enemyEmblem)?.mirror == true
         val executionId = if (mirror) enemyChoice else cardId
         val executionEmblem = if (mirror) enemyEmblem else playerEmblem
         val card = cardById(executionId) ?: return
-        val timeMultiplier = EmblemCatalog.get(executionEmblem)?.timeMultiplier ?: 1.0
-        engine = QteEngine(card, timeMultiplier).start()
-        val eng = engine ?: return
+        val emblem = EmblemCatalog.get(executionEmblem)
+        val timeMultiplier = emblem?.timeMultiplier ?: 1.0
+        val previewSeconds = emblem?.hideSequenceAfterSeconds?.coerceAtLeast(0.0) ?: 0.0
+
+        engine = null
+        ticker?.cancel(); ticker = null
+        previewJob?.cancel(); previewJob = null
+
         _ui.value = uiState.copy(battle = battle.copy(
             chosenPlayerCardId = cardId,
             chosenEnemyCardId = enemyChoice,
             executionCardId = executionId,
             executionEmblemId = executionEmblem,
-            qteActive = true,
+            qteActive = previewSeconds <= 0.0,
+            previewActive = previewSeconds > 0.0,
+            previewRemaining = previewSeconds,
             sequenceVisible = true,
-            sectionIndex = eng.sectionIndex,
-            buttonIndex = eng.buttonIndex,
-            expectedButton = eng.expectedButton,
-            timeRemaining = eng.sectionRemaining,
-            correct = 0, incorrect = 0, missed = 0, accuracy = 0.0, netPower = 0.0,
+            sectionIndex = 0,
+            buttonIndex = 0,
+            expectedButton = card.sections.firstOrNull()?.buttons?.firstOrNull(),
+            timeRemaining = if (previewSeconds > 0.0) previewSeconds else card.sections.firstOrNull()?.timeLimit?.times(timeMultiplier) ?: 0.0,
+            correct = 0,
+            incorrect = 0,
+            missed = 0,
+            accuracy = 0.0,
+            netPower = 0.0,
             lastResult = null,
-            message = if (mirror) "Clan Espejo: ejecutarás la carta rival." else "Ejecuta la secuencia."
+            message = if (previewSeconds > 0.0) "Memoriza la secuencia." else if (mirror) "Clan Espejo." else ""
+        ))
+
+        if (previewSeconds > 0.0) {
+            startShadowPreview(card, timeMultiplier, previewSeconds)
+        } else {
+            startQteEngine(card, timeMultiplier, sequenceVisible = true)
+        }
+    }
+
+    private fun startShadowPreview(card: QteCard, timeMultiplier: Double, seconds: Double) {
+        previewJob?.cancel()
+        previewJob = viewModelScope.launch {
+            val started = System.nanoTime()
+            while (true) {
+                val elapsed = (System.nanoTime() - started) / 1_000_000_000.0
+                val remaining = (seconds - elapsed).coerceAtLeast(0.0)
+                val battle = _ui.value.battle
+                if (!battle.previewActive) return@launch
+                _ui.value = _ui.value.copy(battle = battle.copy(
+                    previewRemaining = remaining,
+                    timeRemaining = remaining,
+                    sequenceVisible = true
+                ))
+                if (remaining <= 0.0) break
+                delay(33)
+            }
+            previewJob = null
+            startQteEngine(card, timeMultiplier, sequenceVisible = false)
+        }
+    }
+
+    private fun startQteEngine(card: QteCard, timeMultiplier: Double, sequenceVisible: Boolean) {
+        val qte = QteEngine(card, timeMultiplier).start()
+        engine = qte
+        val battle = _ui.value.battle
+        _ui.value = _ui.value.copy(battle = battle.copy(
+            previewActive = false,
+            previewRemaining = 0.0,
+            qteActive = true,
+            sequenceVisible = sequenceVisible,
+            sectionIndex = qte.sectionIndex,
+            buttonIndex = qte.buttonIndex,
+            expectedButton = qte.expectedButton,
+            timeRemaining = qte.sectionRemaining,
+            message = ""
         ))
         startTicker()
     }
@@ -406,13 +479,17 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
     private fun syncEngineState() {
         val eng = engine ?: return
         val b = _ui.value.battle
-        val total = cardById(b.executionCardId)?.let(QteFormulas::totalButtons) ?: 0
-        val emblem = EmblemCatalog.get(b.executionEmblemId)
-        val visible = emblem?.hideSequenceAfterSeconds?.let { eng.elapsedTime < it } ?: true
+        val card = cardById(b.executionCardId)
+        val total = card?.let(QteFormulas::totalButtons) ?: 0
+        val shadow = EmblemCatalog.get(b.executionEmblemId)?.hideSequenceAfterSeconds != null
         val acc = QteFormulas.accuracy(eng.correct, total)
-        val net = QteFormulas.netPower(eng.correct, max(eng.elapsedTime, 0.001), cardById(b.executionCardId)?.let(QteFormulas::variationCoefficient) ?: 0.0)
+        val net = QteFormulas.netPower(
+            eng.correct,
+            max(eng.elapsedTime, 0.001),
+            card?.let(QteFormulas::variationCoefficient) ?: 0.0
+        )
         _ui.value = _ui.value.copy(battle = b.copy(
-            sequenceVisible = visible,
+            sequenceVisible = !shadow,
             sectionIndex = eng.sectionIndex,
             buttonIndex = eng.buttonIndex,
             expectedButton = eng.expectedButton,
@@ -426,16 +503,21 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun resolveTurn(playerResult: ExecutionResult) {
-        ticker?.cancel()
+        if (resolvingTurn) return
+        resolvingTurn = true
+        ticker?.cancel(); ticker = null
+        previewJob?.cancel(); previewJob = null
+        engine = null
+
         val app = _ui.value
         val b = app.battle
-        val pOriginal = b.chosenPlayerCardId ?: return
-        val eOriginal = b.chosenEnemyCardId ?: return
+        val pOriginal = b.chosenPlayerCardId ?: run { resolvingTurn = false; return }
+        val eOriginal = b.chosenEnemyCardId ?: run { resolvingTurn = false; return }
         val playerEmblem = b.playerEmblems[pOriginal]
         val enemyEmblem = b.enemyEmblems[eOriginal]
-        val pExecCard = cardById(b.executionCardId) ?: return
+        val pExecCard = cardById(b.executionCardId) ?: run { resolvingTurn = false; return }
         val enemyExecCardId = if (pExecCard.id == eOriginal) pOriginal else eOriginal
-        val enemyExecCard = cardById(enemyExecCardId) ?: return
+        val enemyExecCard = cardById(enemyExecCardId) ?: run { resolvingTurn = false; return }
         val enemyExecEmblem = if (enemyExecCardId == pOriginal) playerEmblem else enemyEmblem
         val enemyResult = simulateEnemy(enemyExecCard, enemyExecEmblem, app.persistent.settings.difficulty)
 
@@ -449,40 +531,131 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
         val enemySelf = BalanceRules.selfDamage(enemyResult, enemyExecEmblem, BalanceRules.maxDamagePerCard)
         val playerHeal = BalanceRules.healing(effectivePlayerDamage, b.executionEmblemId)
         val enemyHeal = BalanceRules.healing(effectiveEnemyDamage, enemyExecEmblem)
-        var newEnemyHp = (b.enemyHp - effectivePlayerDamage - enemySelf + enemyHeal).coerceIn(0.0, BalanceRules.MAX_HP)
-        var newPlayerHp = (b.playerHp - effectiveEnemyDamage - playerSelf + playerHeal).coerceIn(0.0, BalanceRules.MAX_HP)
 
-        usedPlayerCards += pOriginal; usedEnemyCards += eOriginal
+        val playerAfterOwn = (b.playerHp - playerSelf + playerHeal).coerceIn(0.0, BalanceRules.MAX_HP)
+        val enemyAfterPlayer = (b.enemyHp - effectivePlayerDamage).coerceIn(0.0, BalanceRules.MAX_HP)
+        val playerFinal = (playerAfterOwn - effectiveEnemyDamage).coerceIn(0.0, BalanceRules.MAX_HP)
+        val enemyFinal = (enemyAfterPlayer - enemySelf + enemyHeal).coerceIn(0.0, BalanceRules.MAX_HP)
+
+        usedPlayerCards += pOriginal
+        usedEnemyCards += eOriginal
         updateCardExecutionStats(pExecCard.id, playerResult, effectivePlayerDamage)
 
-        val winner = when {
-            newEnemyHp <= 0.0 && newPlayerHp <= 0.0 -> "Empate"
-            newEnemyHp <= 0.0 -> "Jugador"
-            newPlayerHp <= 0.0 -> "Rival"
-            else -> null
-        }
         val nextHands = rotateHands(b, pOriginal, eOriginal)
+        val playerDuration = animationDurationMillis(pExecCard)
+        val enemyDuration = animationDurationMillis(enemyExecCard)
+
         _ui.value = _ui.value.copy(battle = b.copy(
-            playerHp = newPlayerHp,
-            enemyHp = newEnemyHp,
-            turn = if (winner == null) b.turn + 1 else b.turn,
-            playerHand = nextHands.first.first,
-            playerDrawPile = nextHands.first.second,
-            enemyHand = nextHands.second.first,
-            enemyDrawPile = nextHands.second.second,
             qteActive = false,
+            previewActive = false,
+            previewRemaining = 0.0,
             sequenceVisible = true,
             expectedButton = null,
             lastResult = playerResult,
             accuracy = playerResult.accuracy,
             netPower = playerResult.netPower,
-            hitPulse = b.hitPulse + 1,
-            winner = winner,
-            message = winner?.let { if (it == "Empate") "Combate terminado en empate." else "$it gana el combate." }
-                ?: "Daño: %.2f · Rival: %.2f. Elige la siguiente carta.".format(effectivePlayerDamage, effectiveEnemyDamage)
+            animationActive = true,
+            animationSide = "player",
+            animationProgress = 0f,
+            animationType = pExecCard.animation.type,
+            message = ""
         ))
-        engine = null
-        if (winner != null) recordMatchResult(winner)
+
+        animationJob?.cancel()
+        animationJob = viewModelScope.launch {
+            animateDamagePhase(
+                side = "player",
+                type = pExecCard.animation.type,
+                durationMillis = playerDuration,
+                startPlayerHp = b.playerHp,
+                endPlayerHp = playerAfterOwn,
+                startEnemyHp = b.enemyHp,
+                endEnemyHp = enemyAfterPlayer
+            )
+            delay(120)
+            animateDamagePhase(
+                side = "enemy",
+                type = enemyExecCard.animation.type,
+                durationMillis = enemyDuration,
+                startPlayerHp = playerAfterOwn,
+                endPlayerHp = playerFinal,
+                startEnemyHp = enemyAfterPlayer,
+                endEnemyHp = enemyFinal
+            )
+
+            val winner = when {
+                enemyFinal <= 0.0 && playerFinal <= 0.0 -> "Empate"
+                enemyFinal <= 0.0 -> "Jugador"
+                playerFinal <= 0.0 -> "Rival"
+                else -> null
+            }
+            val current = _ui.value.battle
+            _ui.value = _ui.value.copy(battle = current.copy(
+                playerHp = playerFinal,
+                enemyHp = enemyFinal,
+                turn = if (winner == null) b.turn + 1 else b.turn,
+                playerHand = nextHands.first.first,
+                playerDrawPile = nextHands.first.second,
+                enemyHand = nextHands.second.first,
+                enemyDrawPile = nextHands.second.second,
+                animationActive = false,
+                animationSide = null,
+                animationProgress = 0f,
+                animationType = null,
+                winner = winner,
+                message = winner?.let {
+                    if (it == "Empate") "Empate" else "$it gana"
+                } ?: ""
+            ))
+            resolvingTurn = false
+            animationJob = null
+            if (winner != null) recordMatchResult(winner)
+        }
+    }
+
+    private suspend fun animateDamagePhase(
+        side: String,
+        type: String,
+        durationMillis: Long,
+        startPlayerHp: Double,
+        endPlayerHp: Double,
+        startEnemyHp: Double,
+        endEnemyHp: Double
+    ) {
+        val frameMillis = 33L
+        val frames = (durationMillis / frameMillis).coerceAtLeast(1L).toInt()
+        var impactFired = false
+        for (frame in 0..frames) {
+            val progress = frame.toFloat() / frames.toFloat()
+            val hpProgress = ((progress - 0.45f) / 0.45f).coerceIn(0f, 1f)
+            val current = _ui.value.battle
+            val impactNow = !impactFired && progress >= 0.58f
+            if (impactNow) impactFired = true
+            _ui.value = _ui.value.copy(battle = current.copy(
+                playerHp = lerpHp(startPlayerHp, endPlayerHp, hpProgress),
+                enemyHp = lerpHp(startEnemyHp, endEnemyHp, hpProgress),
+                animationActive = true,
+                animationSide = side,
+                animationProgress = progress,
+                animationType = type,
+                hitPulse = current.hitPulse + if (impactNow) 1 else 0
+            ))
+            if (frame < frames) delay(frameMillis)
+        }
+    }
+
+    private fun animationDurationMillis(card: QteCard): Long {
+        val animation = card.animation
+        val baseSeconds = if (animation.mode == "sequence" && animation.sequence.isNotEmpty()) {
+            animation.sequence.sumOf { it.duration.coerceAtLeast(0.12) + it.pauseAfter.coerceAtLeast(0.0) }
+        } else {
+            animation.duration.coerceAtLeast(0.35) + animation.pauseAfter.coerceAtLeast(0.0)
+        }
+        return (baseSeconds * 2150.0).toLong().coerceIn(1200L, 6500L)
+    }
+
+    private fun lerpHp(start: Double, end: Double, progress: Float): Double {
+        return start + (end - start) * progress.coerceIn(0f, 1f)
     }
 
     private fun rotateHands(b: BattleUiState, playerUsed: String, enemyUsed: String): Pair<Pair<List<String>, List<String>>, Pair<List<String>, List<String>>> {
