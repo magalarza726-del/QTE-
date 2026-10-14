@@ -29,8 +29,9 @@ fun BattleScreen(state: PersistentState, battle: BattleUiState, vm: QteViewModel
             Surface(shape = RoundedCornerShape(28.dp), tonalElevation = 5.dp) {
                 Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Arena QTE", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
-                    Text("Cada deck necesita 12 cartas. El combate funciona completamente sin conexión.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Button(onClick = vm::startBattle) { Text("Iniciar combate") }
+                    Text("Antes de combatir elige tus clanes y prepara decks de 15 a 20 cartas.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick = vm::beginPreparation, modifier = Modifier.fillMaxWidth()) { Text("Preparar partida") }
+                    OutlinedButton(onClick = vm::continueToDecks, modifier = Modifier.fillMaxWidth()) { Text("Ir directo a decks") }
                 }
             }
         }
@@ -126,7 +127,7 @@ private fun HandRow(b:BattleUiState,vm:QteViewModel,modifier:Modifier=Modifier) 
     Column(modifier,verticalArrangement=Arrangement.spacedBy(5.dp)) {
         Text(if(b.winner==null)"Tu mano" else "Combate finalizado",fontWeight=FontWeight.Bold)
         if(b.winner!=null) {
-            Button(onClick=vm::startBattle,modifier=Modifier.fillMaxWidth()){Text("Nueva partida")}
+            Button(onClick=vm::beginPreparation,modifier=Modifier.fillMaxWidth()){Text("Preparar nueva partida")}
         } else {
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(7.dp)) {
                 b.playerHand.forEach { id ->
