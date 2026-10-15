@@ -12,10 +12,16 @@ class MediaRepository(private val context: Context) {
     private val directory = File(context.filesDir, "media").apply { mkdirs() }
     private val indexFile = File(directory, "media_index.json")
     private var index: MutableMap<String, MediaMeta> = loadIndex().toMutableMap()
+    private val bundledMusic = BundledMusicStore(context)
 
-    fun allMeta(): List<MediaMeta> = index.values.toList()
-    fun fileFor(id: String?): File? = id?.let { File(directory, safeName(it)) }?.takeIf(File::exists)
-    fun meta(id: String?): MediaMeta? = id?.let(index::get)
+    fun allMeta(): List<MediaMeta> =
+        BundledMusicCatalog.ids.mapNotNull(bundledMusic::meta) + index.values.toList()
+
+    fun fileFor(id: String?): File? =
+        bundledMusic.fileFor(id) ?: id?.let { File(directory, safeName(it)) }?.takeIf(File::exists)
+
+    fun meta(id: String?): MediaMeta? =
+        bundledMusic.meta(id) ?: id?.let(index::get)
 
     fun importUri(uri: Uri, preferredName: String? = null): String {
         val resolver = context.contentResolver
@@ -36,7 +42,7 @@ class MediaRepository(private val context: Context) {
     }
 
     fun delete(id: String?) {
-        if (id == null) return
+        if (id == null || BundledMusicCatalog.isBundled(id)) return
         fileFor(id)?.delete()
         if (index.remove(id) != null) saveIndex()
     }
