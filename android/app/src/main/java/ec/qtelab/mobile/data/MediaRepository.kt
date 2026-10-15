@@ -23,6 +23,10 @@ class MediaRepository(private val context: Context) {
     fun meta(id: String?): MediaMeta? =
         bundledMusic.meta(id) ?: id?.let(index::get)
 
+    fun isAvailable(id: String?): Boolean =
+        BundledMusicCatalog.isBundled(id) ||
+            id?.let { File(directory, safeName(it)).exists() } == true
+
     fun importUri(uri: Uri, preferredName: String? = null): String {
         val resolver = context.contentResolver
         val type = resolver.getType(uri) ?: "application/octet-stream"
