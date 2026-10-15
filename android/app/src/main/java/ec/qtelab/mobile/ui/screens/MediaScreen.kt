@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ec.qtelab.mobile.data.BundledMusicCatalog
 import ec.qtelab.mobile.data.PersistentState
 import ec.qtelab.mobile.ui.components.SectionTitle
 import ec.qtelab.mobile.viewmodel.QteViewModel
@@ -81,8 +82,15 @@ fun MediaScreen(state: PersistentState, vm: QteViewModel) {
                         Spacer(Modifier.width(8.dp))
                         Text("Biblioteca de música",fontWeight=FontWeight.Bold)
                     }
-                    Text("Hasta 20 pistas importadas. No se incluyen músicas procedurales.",color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    Button(onClick={musicPicker.launch(arrayOf("audio/*"))},enabled=settings.musicTracks.size<20) {
+                    val customCount = settings.musicTracks.count { !BundledMusicCatalog.isBundled(it) }
+                    Text(
+                        "6 pistas incluidas · " + customCount + "/20 personalizadas",
+                        color=MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Button(
+                        onClick={musicPicker.launch(arrayOf("audio/*"))},
+                        enabled=customCount<20
+                    ) {
                         Text("Importar pistas")
                     }
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
@@ -96,6 +104,7 @@ fun MediaScreen(state: PersistentState, vm: QteViewModel) {
                         settings.musicTracks.forEach { id ->
                             val meta=vm.mediaMeta(id)
                             val selected=settings.selectedMusicId==id
+                            val bundled=BundledMusicCatalog.isBundled(id)
                             Surface(
                                 shape=RoundedCornerShape(16.dp),
                                 color=if(selected)MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
@@ -103,13 +112,19 @@ fun MediaScreen(state: PersistentState, vm: QteViewModel) {
                                 Row(Modifier.fillMaxWidth().padding(10.dp)) {
                                     Column(Modifier.weight(1f)) {
                                         Text(meta?.name ?: "Audio",fontWeight=FontWeight.Bold,maxLines=1)
-                                        Text(meta?.type ?: "",style=MaterialTheme.typography.labelSmall)
+                                        Text(
+                                            if(bundled) "Incluida · disponible sin Internet" else (meta?.type ?: "Audio importado"),
+                                            style=MaterialTheme.typography.labelSmall,
+                                            color=if(bundled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
                                     if(!settings.randomMusic) {
                                         RadioButton(selected,onClick={vm.selectMusicTrack(id)})
                                     }
-                                    IconButton(onClick={vm.removeMusicTrack(id)}) {
-                                        Icon(Icons.Default.Delete,"Eliminar pista")
+                                    if(!bundled) {
+                                        IconButton(onClick={vm.removeMusicTrack(id)}) {
+                                            Icon(Icons.Default.Delete,"Eliminar pista")
+                                        }
                                     }
                                 }
                             }
