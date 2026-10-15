@@ -94,7 +94,7 @@ data class AppSettings(
     val backgroundOpacity: Int = 25,
     val overlayOpacity: Int = 68,
     val backgroundBlur: Int = 2,
-    val musicTracks: List<String> = emptyList(),
+    val musicTracks: List<String> = BundledMusicCatalog.ids,
     val selectedMusicId: String? = null,
     val lastMusicId: String? = null,
     val randomMusic: Boolean = true
