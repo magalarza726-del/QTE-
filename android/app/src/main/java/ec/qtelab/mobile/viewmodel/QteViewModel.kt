@@ -183,13 +183,20 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
         if (uris.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
             val current = _ui.value.persistent
-            val capacity = (20 - current.settings.musicTracks.size).coerceAtLeast(0)
-            if (capacity == 0) { toast("La biblioteca admite hasta 20 pistas."); return@launch }
+            val customCount = current.settings.musicTracks.count { !BundledMusicCatalog.isBundled(it) }
+            val capacity = (20 - customCount).coerceAtLeast(0)
+            if (capacity == 0) {
+                toast("Ya tienes 20 pistas personalizadas.")
+                return@launch
+            }
             val imported = mutableListOf<String>()
             runCatching {
                 uris.take(capacity).forEach { uri -> imported += repository.media.importUri(uri) }
                 val latest = _ui.value.persistent
-                val tracks = (latest.settings.musicTracks + imported).distinct().take(20)
+                val customTracks = (
+                    latest.settings.musicTracks.filterNot(BundledMusicCatalog::isBundled) + imported
+                    ).distinct().take(20)
+                val tracks = (BundledMusicCatalog.ids + customTracks).distinct()
                 val next = latest.copy(settings = latest.settings.copy(
                     musicTracks = tracks,
                     selectedMusicId = latest.settings.selectedMusicId?.takeIf { it in tracks } ?: tracks.firstOrNull()
@@ -204,6 +211,10 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun removeMusicTrack(id: String) {
+        if (BundledMusicCatalog.isBundled(id)) {
+            toast("Las pistas incluidas con QTE Lab no se eliminan.")
+            return
+        }
         updatePersistent { state ->
             val tracks = state.settings.musicTracks.filterNot { it == id }
             state.copy(settings = state.settings.copy(
