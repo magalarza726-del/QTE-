@@ -113,7 +113,14 @@ class QteRepository(private val context: Context) {
             enemyDeck = deck(state.enemyDeck),
             settings = state.settings.copy(
                 playerEmblems = state.settings.playerEmblems.distinct().take(4),
-                enemyEmblems = state.settings.enemyEmblems.distinct().take(4)
+                enemyEmblems = state.settings.enemyEmblems.distinct().take(4),
+                musicTracks = (
+                    BundledMusicCatalog.ids +
+                        state.settings.musicTracks.filterNot { it.startsWith("proc-") }
+                    ).distinct(),
+                selectedMusicId = state.settings.selectedMusicId?.takeIf {
+                    it in BundledMusicCatalog.ids || it in state.settings.musicTracks
+                }
             )
         )
     }
