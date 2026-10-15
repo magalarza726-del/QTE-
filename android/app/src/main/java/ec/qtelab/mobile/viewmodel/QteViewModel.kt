@@ -345,7 +345,7 @@ class QteViewModel(application: Application) : AndroidViewModel(application) {
         previewJob?.cancel(); previewJob = null
         animationJob?.cancel(); animationJob = null
         resolvingTurn = false
-        val availableTracks = p.settings.musicTracks.filter { repository.media.fileFor(it) != null }
+        val availableTracks = p.settings.musicTracks.filter(repository.media::isAvailable)
         val musicId = if (availableTracks.isEmpty()) null else if (p.settings.randomMusic) {
             val candidates = availableTracks.filterNot { it == p.settings.lastMusicId }.ifEmpty { availableTracks }
             candidates.randomOrNull()
