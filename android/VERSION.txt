@@ -1,3 +1,3 @@
-QTE Lab Android v0.5.0
+QTE Lab Android v0.6.0
 Native Kotlin + Jetpack Compose
-Offline runtime · fixed QTE visibility · 3 s Shadow preview · real-time combat damage animations · 100 bundled card artworks · decks 15–20 · JSON import/export
+Offline runtime · six bundled battle songs · random no-immediate-repeat soundtrack · custom music import · QTE/animation fixes · 100 bundled card artworks · decks 15–20 · JSON import/export
