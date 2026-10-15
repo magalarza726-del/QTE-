@@ -83,7 +83,7 @@ fun QteApp(viewModel: QteViewModel = viewModel()) {
                     title = {
                         Column {
                             Text("QTE Lab", style = MaterialTheme.typography.titleLarge)
-                            Text("Android · v0.5", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            Text("Android · v0.6", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                         }
                     },
                     actions = {
